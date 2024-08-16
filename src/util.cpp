@@ -275,6 +275,50 @@ double Q(double *B, double *F, double *u, double *v, int n, int *nnIndx, int *nn
   return(q);
 }
 
+// BJ 
+double Q_parent(double *B, double *F, double *u, double *v, 
+                double *uParent, double *vParent,
+                int n, int *nnIndx, int *nnIndxLU, 
+                int *nnIndxParent, int *nnIndxLUParent, int *nnIndxLUAll, 
+                bool root){
+  
+  double a, b, Q = 0;
+  int i, j;
+  
+  if (root) {
+#ifdef _OPENMP
+#pragma omp parallel for private(a, b, j) reduction(+:Q)
+#endif  
+    for(i = 0; i < n; i++){
+      a = 0;
+      b = 0;
+      for (j = 0; j < nnIndxLU[n+i]; j++) {
+        a += B[nnIndxLU[i]+j]*u[nnIndx[nnIndxLU[i]+j]];
+        b += B[nnIndxLU[i]+j]*v[nnIndx[nnIndxLU[i]+j]];
+      }
+      Q += (u[i] - a)*(v[i] - b)/F[i];
+    }
+  } else {
+#ifdef _OPENMP
+#pragma omp parallel for private(a, b, j) reduction(+:Q)
+#endif  
+    for(i = 0; i < n; i++){
+      a = 0;
+      b = 0;
+      for (j = 0; j < nnIndxLUParent[n+i]; j++) {
+        a += B[nnIndxLUAll[i]+j]*uParent[nnIndxParent[nnIndxLUParent[i]+j]];
+        b += B[nnIndxLUAll[i]+j]*vParent[nnIndxParent[nnIndxLUParent[i]+j]];
+      }
+      for (j = nnIndxLUParent[n+i]; j < nnIndxLUAll[n+i]; j++) {
+        int j2 = j - nnIndxLUParent[n+i];
+        a += B[nnIndxLUAll[i]+j]*u[nnIndx[nnIndxLU[i]+j2]];
+        b += B[nnIndxLUAll[i]+j]*v[nnIndx[nnIndxLU[i]+j2]];
+      }
+      Q += (u[i] - a)*(v[i] - b)/F[i];
+    }
+  }
+  return(Q);
+}
 
 void printMtrx(double *m, int nRow, int nCol){
 
