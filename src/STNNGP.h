@@ -2,14 +2,22 @@
 #include <Rinternals.h>
 
 extern "C" {
-  SEXP rSTNNGP(SEXP y_r, SEXP X_r, SEXP p_r, SEXP n_r, SEXP m_r, SEXP coords_r, 
+  SEXP rSTNNGP(SEXP y_r, SEXP X_r, 
+               SEXP q_r,                                                        // BJ
+               SEXP p_r, SEXP n_r, SEXP m_r, SEXP coords_r, 
                SEXP covModel_r, SEXP nnIndx_r, SEXP nnIndxLU_r, 
-               SEXP sigmaSqIG_r, SEXP tauSqIG_r, SEXP phiUnif_r, 
-               SEXP nuUnif_r, SEXP rhoUnif_r, 
+               SEXP nnDist_r,                                                   // BJ
+               SEXP nnIndxParent_r, SEXP nnIndxLUParent_r, SEXP nnDistParent_r, // BJ
+               SEXP nnIndxLUAll_r,                                              // BJ
+               SEXP sigmaSqIG_r, 
+               SEXP tauSqIGa_r, SEXP tauSqIGb_r,                                // BJ
+               SEXP phiUnif_r, SEXP nuUnif_r, 
+               SEXP rhoUnif_r,                                                  // BJ
                SEXP betaStarting_r, SEXP sigmaSqStarting_r, SEXP tauSqStarting_r, 
-               SEXP phiStarting_r, SEXP nuStarting_r, SEXP rhoStarting_r,
-               SEXP sigmaSqTuning_r, SEXP tauSqTuning_r, SEXP phiTuning_r, 
-               SEXP nuTuning_r, SEXP rhoTuning_r, 
+               SEXP phiStarting_r, SEXP nuStarting_r, 
+               SEXP rhoStarting_r, SEXP adjmatStarting_r,                       // BJ
+               SEXP sigmaSqTuning_r, SEXP tauSqTuning_r, SEXP phiTuning_r, SEXP nuTuning_r, 
+               SEXP rhoTuning_r,                                                // BJ
                SEXP nSamples_r, SEXP nThreads_r, SEXP verbose_r, SEXP nReport_r);
   
 //   SEXP rNNGP(SEXP y_r, SEXP X_r, SEXP p_r, SEXP n_r, SEXP m_r, SEXP coords_r, SEXP covModel_r, SEXP nnIndx_r, SEXP nnIndxLU_r,
