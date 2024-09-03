@@ -21,9 +21,8 @@ double updateBF_parent(double *B, double *F, double *c, double *C, double *coord
                        int *nnIndx, int *nnIndxLU,
                        int *nnIndxParent, int *nnIndxLUParent, int *nnIndxLUAll,
                        int n, int m, int twomp1, int twomp1sq,
-                       double rho,
                        double *theta, int sigmaSqIndx, int phiIndx, int nuIndx,
-                       double tauSq,
+                       double tauSq, double tauSqParent, double rho, 
                        int covModel, double *bk, double nuUnifb, bool root) {
   
   int i, k, l;
@@ -102,6 +101,9 @@ double updateBF_parent(double *B, double *F, double *c, double *C, double *coord
                       coords[nnIndxParent[nnIndxLUParent[i]+l]],coords[n+nnIndxParent[nnIndxLUParent[i]+l]]);
             C[twomp1sq*threadID+l*nnIndxLUAll[n+i]+k] = theta[sigmaSqIndx]*
               spCor(e, theta[phiIndx], nu, covModel, &bk[threadID*nb]);
+            if (l == k) {
+              C[twomp1sq*threadID+l*nnIndxLUAll[n+i]+k] += tauSqParent;
+            }
           } else {
             int k2 = k-m-1;
             if (l < m+1) {
@@ -115,10 +117,10 @@ double updateBF_parent(double *B, double *F, double *c, double *C, double *coord
                         coords[nnIndx[nnIndxLU[i]+l2]],coords[n+nnIndx[nnIndxLU[i]+l2]]);
               C[twomp1sq*threadID+l*nnIndxLUAll[n+i]+k] = theta[sigmaSqIndx]*
                 spCor(e, theta[phiIndx], nu, covModel, &bk[threadID*nb]);
+              if (l == k) {
+                C[twomp1sq*threadID+l*nnIndxLUAll[n+i]+k] += tauSq;
+              }
             }
-          }
-          if (l == k) {
-            C[twomp1sq*threadID+l*nnIndxLUAll[n+i]+k] += tauSq;
           }
         }
       }
@@ -309,8 +311,8 @@ extern "C" {
     double *tmp_m = NULL;
     double *bk = (double *) R_alloc(nThreads*(1.0+static_cast<int>(floor(nuUnifb))), sizeof(double));
     double *tmp_zero = (double *) R_alloc(n, sizeof(double));                   // BJ
-    for(i = 0; i < n; i++){tmp_zero[i] = 0;}                                    // BJ
-    
+    zeros(tmp_zero, n);                                                         // BJ
+
     bool thetaUpdate = true;
     bool root; 
     int ParentIndx;
@@ -350,8 +352,9 @@ extern "C" {
                                            nnIndx, nnIndxLU,
                                            nnIndxParent, nnIndxLUParent, nnIndxLUAll,
                                            n, m, twomp1, twomp1sq,
-                                           rho[MeIndx], theta, sigmaSqIndx, phiIndx, nuIndx,
-                                           tauSq[MeIndx], covModel, bk, nuUnifb, root);
+                                           theta, sigmaSqIndx, phiIndx, nuIndx,
+                                           tauSq[MeIndx], tauSq[ParentIndx], rho[MeIndx], 
+                                           covModel, bk, nuUnifb, root);
           
           for(i = 0; i < p; i++){
             tmp_p[i] = Q_parent(B, F, &X[n*i], &y[n*MeIndx], tmp_zero, tmp_zero,
@@ -468,8 +471,10 @@ extern "C" {
                                       nnIndx, nnIndxLU,
                                       nnIndxParent, nnIndxLUParent, nnIndxLUAll,
                                       n, m, twomp1, twomp1sq,
-                                      rhoCand[MeIndx], thetaCand, sigmaSqIndx, phiIndx, nuIndx,
-                                      tauSqCand[MeIndx], covModel, bk, nuUnifb, root);
+                                      thetaCand, sigmaSqIndx, phiIndx, nuIndx,
+                                      tauSqCand[MeIndx], tauSqCand[ParentIndx], 
+                                      rhoCand[MeIndx], 
+                                      covModel, bk, nuUnifb, root);
         
         F77_NAME(dgemv)(ntran, &n, &p, &one, X, &n, &beta[p*MeIndx], &inc, &zero, tmp_n, &inc FCONE);
         F77_NAME(daxpy)(&n, &negOne, &y[n*MeIndx], &inc, tmp_n, &inc);
