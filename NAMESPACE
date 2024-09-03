@@ -1,9 +1,11 @@
-useDynLib(spNNGP, .registration=TRUE)
+useDynLib(STNNGP, .registration=TRUE)
 
 export(spNNGP)
 export(spConjNNGP)
 export(PGLogit)
 export(spDiag)
+export(STNNGP)
+export(STNNGP_NS)
 
 ## methods for class betareg
 S3method("print", "NNGP")
