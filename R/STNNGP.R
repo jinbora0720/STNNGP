@@ -284,7 +284,10 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response", 
   if(!"rho" %in% names(starting)) {                                             # BJ
     stop("error: matrix of rho's must be specified in starting value list")     # BJ
   }                                                                             # BJ
-  rho.starting <- starting[["rho"]]                                             # BJ: q vector
+  rho.starting <- starting[["rho"]]                                             # BJ
+  if (!is.vector(rho.starting) || length(rho.starting) != q-1) {                # BJ
+    stop("error: rho.starting must be a vector of length q-1")                  # BJ: without root
+  }                                                                             # BJ
   
   if(!"adjmat" %in% names(starting)) {                                          # BJ
     stop("error: adjmat                                                         # BJ
@@ -335,7 +338,10 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response", 
   if (!"rho" %in% names(tuning)) {                                              # BJ
     stop("error: rho must be specified in tuning value list")                   # BJ
   }                                                                             # BJ
-  rho.tuning <- tuning[["rho"]][1]                                              # BJ
+  rho.tuning <- tuning[["rho"]]                                                 # BJ
+  if (!is.vector(rho.tuning) || length(rho.tuning) != q-1) {                    # BJ: without root
+    stop("error: rho.tuning must be a vector of length q-1")                    # BJ
+  }                                                                             # BJ
   
   storage.mode(sigma.sq.tuning) <- "double"
   storage.mode(tau.sq.tuning) <- "double"

@@ -247,13 +247,14 @@ extern "C" {
     
     //starting	
     int pq = p*q;                                                               // BJ
+    int qm1 = q-1;                                                              // BJ
     double *beta = (double *) R_alloc(pq, sizeof(double));                      // BJ
     double *betaj = (double *) R_alloc(p, sizeof(double));                      // BJ
     double *beta2 = (double *) R_alloc(pq, sizeof(double));                     // BJ
     double *beta2j = (double *) R_alloc(p, sizeof(double));                     // BJ
     double *theta = (double *) R_alloc(nTheta, sizeof(double));
     double *tauSq = (double *) R_alloc(q, sizeof(double));                      // BJ
-    double *rho = (double *) R_alloc(q, sizeof(double));                        // BJ
+    double *rho = (double *) R_alloc(qm1, sizeof(double));                      // BJ
     int *adjvec = INTEGER(adjmatStarting_r);                                    // BJ
     
     F77_NAME(dcopy)(&pq, REAL(betaStarting_r), &inc, beta, &inc);               // BJ
@@ -264,9 +265,8 @@ extern "C" {
       theta[nuIndx] = REAL(nuStarting_r)[0];
     }
     F77_NAME(dcopy)(&q, REAL(tauSqStarting_r), &inc, tauSq, &inc);              // BJ
-    F77_NAME(dcopy)(&q, REAL(rhoStarting_r), &inc, rho, &inc);                  // BJ
-    rho[0] = 1;                                                                 // BJ: rho[0] is simply a place holder
-    
+    F77_NAME(dcopy)(&qm1, REAL(rhoStarting_r), &inc, rho, &inc);                // BJ
+
     //tuning and fixed
     double *tuning = (double *) R_alloc(nTheta, sizeof(double));
     
@@ -276,14 +276,14 @@ extern "C" {
       tuning[nuIndx] = REAL(nuTuning_r)[0];
     }
     double *tauSqTuning = REAL(tauSqTuning_r);                                  // BJ
-    double rhoTuning = REAL(rhoTuning_r)[0];                                    // BJ
+    double *rhoTuning = REAL(rhoTuning_r);                                      // BJ
     
     //return stuff  
     SEXP betaSamples_r, thetaSamples_r, tauSqSamples_r, rhoSamples_r;           // BJ
     PROTECT(betaSamples_r = allocMatrix(REALSXP, pq, nSamples)); nProtect++;    // BJ
     PROTECT(thetaSamples_r = allocMatrix(REALSXP, nTheta, nSamples)); nProtect++; 
     PROTECT(tauSqSamples_r = allocMatrix(REALSXP, q, nSamples)); nProtect++;    // BJ
-    PROTECT(rhoSamples_r = allocMatrix(REALSXP, q, nSamples)); nProtect++;      // BJ
+    PROTECT(rhoSamples_r = allocMatrix(REALSXP, qm1, nSamples)); nProtect++;    // BJ
     
     //miscellaneous
     int nIndx = static_cast<int>(static_cast<double>(m*(m-1)/2+(n-m)*m+(m+1)*n)); // BJ
@@ -292,7 +292,7 @@ extern "C" {
     double *thetaCand = (double *) R_alloc(nTheta, sizeof(double));
     double *tauSqCand = (double *) R_alloc(q, sizeof(double));                  // BJ
     F77_NAME(dcopy)(&q, tauSq, &inc, tauSqCand, &inc);                          // BJ
-    double *rhoCand = (double *) R_alloc(q, sizeof(double));                    // BJ
+    double *rhoCand = (double *) R_alloc(qm1, sizeof(double));                  // BJ
     double *B = (double *) R_alloc(nIndx, sizeof(double));                      // BJ
     double *F = (double *) R_alloc(n, sizeof(double));                          // BJ
     double *c =(double *) R_alloc(twomp1*nThreads, sizeof(double));             // BJ
@@ -353,7 +353,7 @@ extern "C" {
                                            nnIndxParent, nnIndxLUParent, nnIndxLUAll,
                                            n, m, twomp1, twomp1sq,
                                            theta, sigmaSqIndx, phiIndx, nuIndx,
-                                           tauSq[MeIndx], tauSq[ParentIndx], rho[MeIndx], 
+                                           tauSq[MeIndx], tauSq[ParentIndx], rho[MeIndx-1], 
                                            covModel, bk, nuUnifb, root);
           
           for(i = 0; i < p; i++){
@@ -426,7 +426,7 @@ extern "C" {
       }
       // BJ
       for (int o = 1; o < q; o++) {
-        logPostCurrent += log(rho[o] - rhoUnifa) + log(rhoUnifb - rho[o]);
+        logPostCurrent += log(rho[o-1] - rhoUnifa) + log(rhoUnifb - rho[o-1]);
       }
       for (int o = 0; o < q; o++) {
         if (tauSq[o] != 0) {
@@ -444,9 +444,8 @@ extern "C" {
         thetaCand[nuIndx] = logitInv(rnorm(logit(theta[nuIndx], nuUnifa, nuUnifb), tuning[nuIndx]), nuUnifa, nuUnifb);
       }
       // BJ
-      rhoCand[0] = 1;
       for (int o = 1; o < q; o++) {
-        rhoCand[o] = logitInv(rnorm(logit(rho[o], rhoUnifa, rhoUnifb), rhoTuning), rhoUnifa, rhoUnifb);
+        rhoCand[o-1] = logitInv(rnorm(logit(rho[o-1], rhoUnifa, rhoUnifb), rhoTuning[o-1]), rhoUnifa, rhoUnifb);
       }
       // std::cout << "rho: (" << rhoCand[0] << ", " << rhoCand[1] << ", " << rhoCand[2] << ")" << "\n";
       for (int o = 0; o < q; o++) {
@@ -473,7 +472,7 @@ extern "C" {
                                       n, m, twomp1, twomp1sq,
                                       thetaCand, sigmaSqIndx, phiIndx, nuIndx,
                                       tauSqCand[MeIndx], tauSqCand[ParentIndx], 
-                                      rhoCand[MeIndx], 
+                                      rhoCand[MeIndx-1], 
                                       covModel, bk, nuUnifb, root);
         
         F77_NAME(dgemv)(ntran, &n, &p, &one, X, &n, &beta[p*MeIndx], &inc, &zero, tmp_n, &inc FCONE);
@@ -492,7 +491,7 @@ extern "C" {
         logPostCand += log(thetaCand[nuIndx] - nuUnifa) + log(nuUnifb - thetaCand[nuIndx]);
       }
       for (int o = 1; o < q; o++) {
-        logPostCand += log(rhoCand[o] - rhoUnifa) + log(rhoUnifb - rhoCand[o]);
+        logPostCand += log(rhoCand[o-1] - rhoUnifa) + log(rhoUnifb - rhoCand[o-1]);
       }
       for (int o = 0; o < q; o++) {
         if (tauSqCand[o] != 0) {
@@ -506,7 +505,7 @@ extern "C" {
       if (runif(0.0, 1.0) <= exp(logPostCand - logPostCurrent)) {
         thetaUpdate = true;
         dcopy_(&nTheta, thetaCand, &inc, theta, &inc);
-        dcopy_(&q, rhoCand, &inc, rho, &inc);
+        dcopy_(&qm1, rhoCand, &inc, rho, &inc);                                 // BJ
         dcopy_(&q, tauSqCand, &inc, tauSq, &inc);
         accept++;
         batchAccept++;
@@ -514,7 +513,7 @@ extern "C" {
       //save samples
       F77_NAME(dcopy)(&pq, beta, &inc, &REAL(betaSamples_r)[s*pq], &inc);
       F77_NAME(dcopy)(&nTheta, theta, &inc, &REAL(thetaSamples_r)[s*nTheta], &inc);
-      F77_NAME(dcopy)(&q, rho, &inc, &REAL(rhoSamples_r)[s*q], &inc);
+      F77_NAME(dcopy)(&qm1, rho, &inc, &REAL(rhoSamples_r)[s*qm1], &inc);
       F77_NAME(dcopy)(&q, tauSq, &inc, &REAL(tauSqSamples_r)[s*q], &inc);
       
       //report

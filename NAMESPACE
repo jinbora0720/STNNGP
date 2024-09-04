@@ -5,7 +5,9 @@ export(spConjNNGP)
 export(PGLogit)
 export(spDiag)
 export(STNNGP)
+export(rstnngp)
 export(STNNGP_NS)
+export(rstnngp_ns)
 
 ## methods for class betareg
 S3method("print", "NNGP")
