@@ -1,0 +1,349 @@
+---
+title: "Spanning Tree-based NNGP"
+author: "Bora Jin"
+editor_options:
+  chunk_output_type: console
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(message = FALSE, 
+                      warning = FALSE, 
+                      fig.align = "center" # figure alignment
+                      )
+```
+
+Spanning Tree-based Nearest Neighbor Gaussian Process (STNNGP) is a multivariate 
+spatial regression model for large data. 
+
+### Model specifications
+
+Let $q$ be the number of variables, $\mathscr{D} \subset \mathbb{R}^d$ be our domain of interest,
+and $\mathscr{S}=\{\mathbf{s}_1,\dots,\mathbf{s}_n\} \subset \mathscr{D}$ be an arbitrary set of locations. 
+We assume a spanning tree $T$ among $q$ variables known, which defines an inter-variable relationship.
+A spanning tree is an undirected graph, but we can directly obtain a set of directed edges 
+from the spanning tree by choosing a root and flowing away from the root. 
+In this example, we arbitrarily choose the first variable to be the root and 
+have $E_T = \{(j \rightarrow k) : k=2,\dots,q\}$ as the set of directed edges from $T$. 
+Since $T$ is a spanning tree, every node has only one incoming edge except the root
+which has no incoming edge.
+
+For $nq$-vector $\mathbf{y}(\mathscr{S}) = (y_1(\mathscr{S})^T, \dots, y_q(\mathscr{S}))^T$, 
+we define its joint density as 
+$\tilde{f}(\mathbf{y}(\mathscr{S})) = \prod_{i=1}^n \tilde{f}_{N}(\mathbf{y}(\mathbf{s}_i))$, 
+in which the conditional density $\tilde{f}_{N}$ for each location $\mathbf{s}_i \in \mathscr{S}$ is 
+\begin{align}
+    \tilde{f}_N(\mathbf{y}(\mathbf{s}_i)) = f(y_1(\mathbf{s}_i)\mid y_1(N_d(\mathbf{s}_i)))\times \prod_{(j \rightarrow k)\in E_{T}} f(y_k(\mathbf{s}_i)\mid y_k(N_d(\mathbf{s}_i)), y_j(\mathbf{s}_i), y_j(N(\mathbf{s}_i)))
+    \label{eq:jointden_si}
+\end{align}
+with some base density $f$ where $N_d(\mathbf{s}_i) \subset \{\mathbf{s}_1,\dots,\mathbf{s}_{i-1}\}$ and 
+$N(\mathbf{s}_i) \subset \mathscr{S}\setminus \{\mathbf{s}_i\}$ are a directed and 
+an undirected nearest neighbor set of $\mathbf{s}_i$ by Euclidean distance, respectively. 
+
+An STNNGP model assumes 
+\[\mathbf{y}(\mathscr{S}) \sim N((I_q\otimes X)\mathbf{\beta}_L, \Sigma+diag(\tau_1^2,\dots,\tau_q^2)\otimes I_n),\] at observed locations $\mathscr{S}$, where $X$ is a $n\times p$ matrix of covariates,
+$\mathbf{\beta}_L = (\mathbf{\beta}_1^T, \dots, \mathbf{\beta}_q^T)^T$ is a $pq$-vector of coefficients, 
+and $\Sigma+diag(\tau_1^2,\dots,\tau_q^2)\otimes I_n$ is a spatial covariance matrix 
+with variable-specific nuggets. 
+
+The package `STNNGP` implements a separable and a nonseparable model; 
+a separable model assumes $\Sigma = R \otimes M$ where $R$ is a $q\times q$ matrix 
+of inter-variable correlation coefficients whose $(j,k)$ element is defined and has 
+a value between -1 and 1 if $(j\rightarrow k) \in E_T$ or $(k\rightarrow j) \in E_T$. 
+$M$ is an $n\times n$ Matern covariance matrix with spatial variability $\sigma^2$, 
+decay $\phi$, and smoothness $\nu$. 
+A nonseparable model assumes a multivariate Matern covariance function where each 
+marginal Matern covariance has its own $(\sigma_j^2, \phi_j, \nu_j)$ for $j=1,\dots,q$.
+We define a cross-covariance function $C_{jk}(\mathbf{s},\mathbf{s}') = \rho_{jk}\sigma_j\sigma_k 2^{1-\nu_{jk}}(\phi_{jk} \|\mathbf{s}-\mathbf{s}'\|)^{\nu_{jk}}K_{\nu_{jk}}(\phi_{jk} \|\mathbf{s}-\mathbf{s}'\|)/\Gamma(\nu_{jk})$ if $(j\rightarrow k) \in E_T$ or $(k\rightarrow j) \in E_T$. 
+Due to our spanning tree approach, we simply need to ensure validity of a 
+bivariate Matern covariance for each $(j\rightarrow k) \in E_T$. We follow Theorem 3 (c) 
+in [Gneiting, Kleiber, and Schlather (2010)](https://doi.org/10.1198/jasa.2010.tm09420)
+for conditions to be a valid bivariate Matern model. 
+
+### Package illustration
+
+This document presents model fitting and results of STNNGP response models using 
+the package `STNNGP`. 
+We start with loading necessary packages: 
+
+```{r load-package}
+library(tidyverse)
+theme_set(theme_bw())
+library(igraph)
+# devtools::install_github("jinbora0720/STNNGP")
+library(STNNGP)
+```
+
+We first generate data from a separable STNNGP model and fit using a function `STNNGP`.
+Tuning parameters are pre-tuned so that overall Metropolis acceptance rate is around 30%. 
+
+```{r rstnngp}
+# set seed 
+seed <- 20240720
+set.seed(seed)
+
+# create coordinates on a grid 
+coords <- expand.grid(seq(0, 1, length = 20), 
+                      seq(0, 1, length = 20)) %>% 
+  arrange(Var1) %>%                                                             
+  as.matrix() 
+
+# parameters 
+## number of neighbors
+m <- 15
+
+## covariance
+q <- 5
+tau.sq <- seq(0.01, 0.1, length = q)
+rho <- runif(q-1, -1, 1)
+sigma.sq <- 3
+phi <- 3/0.5
+
+## coefficients for covariates
+p <- 2
+beta <- matrix(runif(p*q, -0.5, 3), p, q)
+
+## spanning tree
+A <- matrix(0, q, q)
+for (j in 2:q) {
+  A[sample(j-1,1),j] <- 1
+}
+T0 <- graph_from_adjacency_matrix(A, "undirected")
+plot(T0, layout = layout_as_tree(T0, root = 1), main = "Spanning Tree")
+
+# fitting parameters
+n.threads <- 15
+burn <- 1000
+thin <- 2
+save <- 1000
+n.samples <- burn + thin*save
+starting <- list("beta" = beta, "phi" = phi, "sigma.sq" = sigma.sq, 
+                 "tau.sq" = tau.sq, "rho" = rho, "adjmat" = A)
+tuning <- list("phi" = 0.1, "sigma.sq" = 0.1, "tau.sq" = tau.sq/5, 
+               "rho" = rep(0.05, q-1))                                          
+priors <- list("phi.Unif" = c(3/1, 3/0.3), "sigma.sq.IG" = c(2, sigma.sq), 
+               "tau.sq.IG" = cbind(2, tau.sq), "rho.Unif" = c(-1, 1))
+cov.model <- "exponential"
+```
+
+```{r STNNGP, cache = TRUE}
+# number of replicates 
+reps <- 10
+
+# set seeds for replicates 
+seeds <- sample(100, reps)
+
+# save results 
+betas <- matrix(0, reps, p*q)
+tau.sqs <- matrix(0, reps, q)
+sigma.sqs <- rep(0, reps)
+phis <- rep(0, reps)
+ssqphis <- rep(0, reps)
+rhos <- matrix(0, reps, q-1)
+telapsed <- rep(0, reps)
+
+for (i in 1:reps) {
+  seed <- seeds[i]
+  data <- rstnngp(coords, 
+                  params = list(tau.sq = tau.sq,
+                              sigma.sq = sigma.sq,
+                              phi = phi, 
+                              rho = rho,
+                              beta = beta, 
+                              A = A, 
+                              n.neighbors = m), 
+                  seed = seed)
+                
+  out <- STNNGP(data$Y ~ data$X-1,
+                coords = coords, method = "response",
+                n.neighbors = m,
+                starting = starting, tuning = tuning, priors = priors,
+                cov.model = cov.model,
+                n.samples = n.samples,
+                n.omp.threads = n.threads,
+                verbose = FALSE)
+  
+  betas[i,] <- out$p.beta.samples[burn+thin*1:save,] %>% colMeans()
+  tau.sqs[i,] <- out$p.tausq.samples[burn+thin*1:save,] %>% colMeans()
+  sigma.sqs[i] <- out$p.theta.samples[burn+thin*1:save,1] %>% mean()
+  phis[i] <- out$p.theta.samples[burn+thin*1:save,2] %>% mean()
+  ssqphis[i] <- (out$p.theta.samples[burn+thin*1:save,1]*
+                   out$p.theta.samples[burn+thin*1:save,2]) %>% mean()
+  rhos[i,] <- out$p.rho.samples[burn+thin*1:save,] %>% colMeans()
+  telapsed[i] <- out$run.time[3]
+}
+```
+
+```{r STNNGP_res, echo = FALSE, out.width = "100%", fig.height = 6.5}
+params_est <- cbind(betas, tau.sqs, sigma.sqs, phis, ssqphis, rhos, telapsed) %>% 
+  as.data.frame()
+params_true <- c(c(beta), tau.sq, sigma.sq, phi, sigma.sq*phi, rho) %>% 
+  matrix(., nrow = 1) %>% 
+  as.data.frame()
+col_labels <- c(paste0("beta[",1:(p*q),"]"), 
+                paste0("tau[",1:q,"]^2"), 
+                "sigma^2", "phi", "sigma^2*phi", 
+                paste0("rho[",apply(A[,2:q], 2, function(x) which(x==1)),2:q,"]"),
+                "time (secs)")
+                          
+colnames(params_est) <- col_labels
+colnames(params_true) <- col_labels[-length(col_labels)]
+params_est_long <- params_est %>% pivot_longer(everything(), names_to = "var") 
+params_true_long <- params_true %>% pivot_longer(everything(), names_to = "var") 
+params_est_long %>%
+  ggplot(aes(y = value)) + 
+  facet_wrap(~factor(var, levels = col_labels), 
+             labeller = label_parsed, scales = "free") +
+  geom_boxplot(fill = "gray90") +
+  geom_hline(data = params_true_long, aes(yintercept = value), 
+             color = "red", linetype = "dashed") + 
+  labs(y = "", x = "", title = "Parameter estimates over replicates") +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+```
+
+We next run a nonseparable STNNGP simulation using a function `STNNGP_NS`.
+
+```{r rstnngp_ns}
+# set seed 
+seed <- 20240720
+set.seed(seed)
+
+# create coordinates on a grid 
+coords <- expand.grid(seq(0, 1, length = 15), 
+                      seq(0, 1, length = 15)) %>% 
+  arrange(Var1) %>%                                                             
+  as.matrix() 
+
+# parameters 
+## number of neighbors
+m <- 15
+
+## spanning tree
+q <- 4
+A <- matrix(0, q, q)
+for (j in 2:q) {
+  A[j-1,j] <- 1
+}
+T0 <- graph_from_adjacency_matrix(A, "undirected")
+plot(T0, layout = layout_as_tree(T0, root = 1), main = "Spanning Tree")
+
+## covariance
+tau.sq <- seq(0.01, 0.1, length = q)
+rho <- runif(q-1, -1, 1)
+phi <- seq(3/0.2, 3/0.8, length = q)                                            
+sigma.sq <- seq(1, 3, length = q)
+cross_phi <- rep(0, q-1)
+for (me in 2:q) {
+  parent <- which(A[,me] == 1)
+  cross_phi[me-1] <- sqrt(0.5*(phi[parent]^2+phi[me]^2))
+}
+  
+## coefficients for covariates
+p <- 2
+beta <- matrix(runif(p*q, -0.5, 3), p, q)
+
+# fitting parameters
+n.threads <- 15
+burn <- 1000
+thin <- 2
+save <- 1000
+n.samples <- burn + thin*save
+starting <- list("beta" = beta, "phi" = phi, "sigma.sq" = sigma.sq, "tau.sq" = tau.sq, 
+                "cross.phi" = cross_phi, "rho" = rho, "adjmat" = A)
+tuning <- list("phi" = rep(0.1, q),                                        
+               "cross.phi" = rep(0.5, q-1), 
+               "sigma.sq" = rep(0.01, q), "tau.sq" = tau.sq/5, 
+               "rho" = rep(0.01, q-1))
+priors <- list("phi.Unif" = cbind(rep(3/1, q), rep(3/0.1, q)), 
+               "sigma.sq.IG" = cbind(2, sigma.sq), 
+               "tau.sq.IG" = cbind(2, tau.sq))
+cov.model <- "exponential"
+```
+
+```{r STNNGP_NS, cache = TRUE}
+# number of replicates 
+reps <- 10
+
+# set seeds for replicates 
+seeds <- sample(100, reps)
+
+# save results 
+betas <- matrix(0, reps, p*q)
+tau.sqs <- matrix(0, reps, q)
+sigma.sqs <- matrix(0, reps, q)
+phis <- matrix(0, reps, q)
+ssqphis <- matrix(0, reps, q)
+cross_phis <- matrix(0, reps, q-1)
+rhos <- matrix(0, reps, q-1)
+telapsed <- rep(0, reps)
+
+for (i in 1:reps) {
+  seed <- seeds[i]
+  data <- rstnngp_ns(coords, 
+                params = list(tau.sq = tau.sq,
+                              sigma.sq = sigma.sq,
+                              phi = phi, 
+                              cross_phi = cross_phi, 
+                              rho = rho,
+                              beta = beta, 
+                              A = A, 
+                              n.neighbors = m), 
+                seed = seed)
+
+  out <- STNNGP_NS(data$Y ~ data$X-1,
+                coords = coords, method = "response",
+                n.neighbors = m,
+                starting = starting, tuning = tuning, priors = priors,
+                cov.model = cov.model,
+                n.samples = n.samples,
+                n.omp.threads = n.threads,
+                verbose = FALSE)
+  
+  betas[i,] <- out$p.beta.samples[burn+thin*1:save,] %>% colMeans()
+  tau.sqs[i,] <- out$p.tausq.samples[burn+thin*1:save,] %>% colMeans()
+  sigma.sqs[i,] <- out$p.sigmasq.samples[burn+thin*1:save,] %>% colMeans()
+  phis[i,] <- out$p.phi.samples[burn+thin*1:save,] %>% colMeans()
+  ssqphis[i,] <- (out$p.sigmasq.samples[burn+thin*1:save,]*
+                   out$p.phi.samples[burn+thin*1:save,]) %>% colMeans()
+  cross_phis[i,] <- out$p.crossphi.samples[burn+thin*1:save,] %>% colMeans()
+  rhos[i,] <- out$p.rho.samples[burn+thin*1:save,] %>% colMeans()
+  telapsed[i] <- out$run.time[3]
+}
+```
+
+```{r STNNGP_NSres, echo = FALSE, out.width = "100%", fig.height = 6.5}
+params_est <- cbind(betas, tau.sqs, sigma.sqs, phis, ssqphis, cross_phis, rhos, telapsed) %>% 
+  as.data.frame()
+params_true <- c(c(beta), tau.sq, sigma.sq, phi, sigma.sq*phi, cross_phi, rho) %>% 
+  matrix(., nrow = 1) %>% 
+  as.data.frame()
+col_labels <- c(paste0("beta[",1:(p*q),"]"), 
+                paste0("tau[",1:q,"]^2"), 
+                paste0("sigma[",1:q,"]^2"), 
+                paste0("phi[",1:q,"]^2"), 
+                paste0("(sigma^2*phi)[",1:q,"]^2"), 
+                paste0("phi[",apply(A[,2:q], 2, function(x) which(x==1)),2:q,"]"),
+                paste0("rho[",apply(A[,2:q], 2, function(x) which(x==1)),2:q,"]"),
+                "time (secs)")
+colnames(params_est) <- col_labels
+colnames(params_true) <- col_labels[-length(col_labels)]
+params_est_long <- params_est %>% pivot_longer(everything(), names_to = "var") 
+params_true_long <- params_true %>% pivot_longer(everything(), names_to = "var") 
+params_est_long %>%
+  ggplot(aes(y = value)) + 
+  facet_wrap(~factor(var, levels = col_labels), 
+             labeller = label_parsed, scales = "free") +
+  geom_boxplot(fill = "gray90") +
+  geom_hline(data = params_true_long, aes(yintercept = value), color = "red", linetype = "dashed") + 
+  labs(y = "", x = "", title = "Parameter estimates over replicates") +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+```
