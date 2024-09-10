@@ -284,7 +284,7 @@ extern "C" {
     PROTECT(thetaSamples_r = allocMatrix(REALSXP, nTheta, nSamples)); nProtect++; 
     PROTECT(tauSqSamples_r = allocMatrix(REALSXP, q, nSamples)); nProtect++;    // BJ
     PROTECT(rhoSamples_r = allocMatrix(REALSXP, qm1, nSamples)); nProtect++;    // BJ
-    
+
     //miscellaneous
     int nIndx = static_cast<int>(static_cast<double>(m*(m-1)/2+(n-m)*m+(m+1)*n)); // BJ
     int twomp1 = 2*m+1;                                                         // BJ
@@ -550,7 +550,7 @@ extern "C" {
     
     //make return object
     SEXP result_r, resultName_r;
-    int nResultListObjs = 4;
+    int nResultListObjs = 5;
     
     PROTECT(result_r = allocVector(VECSXP, nResultListObjs)); nProtect++;
     PROTECT(resultName_r = allocVector(VECSXP, nResultListObjs)); nProtect++;
