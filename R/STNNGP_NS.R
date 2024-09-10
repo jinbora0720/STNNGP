@@ -308,20 +308,24 @@ STNNGP_NS <- function(formula, data = parent.frame(), coords, method = "response
     }                                                                           # BJ
   }
   
-  if(!"rho" %in% names(starting)) {                                             # BJ
-    stop("error: matrix of rho's must be specified in starting value list")     # BJ
+  if(!"adjmat" %in% names(starting)) {                                          # BJ
+    stop("error: adjmat (graph adjacency matrix) must be specified in starting value list")} # BJ                     
+  adjmat.starting <- starting[["adjmat"]]                                       # BJ: a qxq matrix
+  emp_rho <- cor(Y)                                                             # BJ
+  if (isSymmetric(adjmat.starting)) {                                           # BJ
+    print("An undirected graph is provided. Its directed minimum spanning tree with root 1 will be used whose edge weights are proportional to the negative of absolute empirical correlation coefficients.") # BJ
+    adjmat.starting <- directedMST(-abs(emp_rho)*adjmat.starting, root = 1)     # BJ
   }                                                                             # BJ
-  rho.starting <- starting[["rho"]]                                             # BJ
+  
+  if(!"rho" %in% names(starting)) {                                             # BJ
+    rho.starting <- colSums(emp_rho*adjmat.starting)[-1]                        # BJ
+  } else {
+    rho.starting <- starting[["rho"]]                                           # BJ
+  }
   if (!is.vector(rho.starting) || length(rho.starting) != q-1) {                # BJ
     stop("error: rho.starting must be a vector of length q-1")                  # BJ: without root
-  }                                                                             # BJ
-  
-  if(!"adjmat" %in% names(starting)) {                                          # BJ
-    stop("error: adjmat                                                         # BJ
-             (spanning tree adjacency matrix: from row to column)               # BJ
-             must be specified in starting value list")}                        # BJ
-  adjmat.starting <- starting[["adjmat"]]                                       # BJ: a qxq matrix
-  
+  }
+
   if(!"cross.phi" %in% names(starting)) {                                       # BJ
     for (j in 2:q) {                                                            # BJ
       parent <- which(adjmat.starting[,j] == 1)                                 # BJ
@@ -493,17 +497,17 @@ STNNGP_NS <- function(formula, data = parent.frame(), coords, method = "response
       out <- .Call("rSTNNGP_NS", Y, X, q, p, n, n.neighbors, coords,
                    cov.model.indx, nn.indx, nn.indx.lu,
                    nn.indx.parent, nn.indx.lu.parent, nn.indx.lu.all,
-                   sigma.sq.IGa, sigma.sq.IGb, 
-                   tau.sq.IGa, tau.sq.IGb, 
+                   sigma.sq.IGa, sigma.sq.IGb,
+                   tau.sq.IGa, tau.sq.IGb,
                    phi.Unifa, phi.Unifb,
                    nu.Unifa, nu.Unifb,
                    beta.starting, sigma.sq.starting, tau.sq.starting,
-                   phi.starting, 
+                   phi.starting,
                    cross.phi.starting,
                    nu.starting,
                    rho.starting,
                    adjmat.starting,
-                   sigma.sq.tuning, tau.sq.tuning, phi.tuning, cross.phi.tuning, 
+                   sigma.sq.tuning, tau.sq.tuning, phi.tuning, cross.phi.tuning,
                    nu.tuning, rho.tuning,
                    n.samples, n.omp.threads, verbose, n.report)
       

@@ -37,9 +37,12 @@ double rholim(double crossphi, double phi, double phiParent,
                                      func_tsq(tsq, crossphi, phi, phiParent, nu, nuParent, crossnu)), // BJ: tsq can be negative. when it is, func_tsq = -nan. excluded for finding the min
                                      func_tsq(1e+17, crossphi, phi, phiParent, nu, nuParent, crossnu)); // BJ: 1e+17 role of infinity
   // std::cout << "infimum: " << infimum << "\n";
-  return gammafn(nu+1)/gammafn(nu)*gammafn(nuParent+1)/gammafn(nuParent)*
+  // std::cout << "infimum: " << infimum << "\n";
+  double value = gammafn(nu+1)/gammafn(nu)*gammafn(nuParent+1)/gammafn(nuParent)*
     pow(gammafn(crossnu),2)/pow(gammafn(crossnu+1),2)*
     pow(phi,2*nu)*pow(phiParent,2*nuParent)/pow(crossphi,4*crossnu)*infimum;
+  
+  return pow(value, 0.5);
 }
 
 // BJ
@@ -357,8 +360,6 @@ extern "C" {
     double *tmp_p2 = (double *) R_alloc(p, sizeof(double));
     double *tmp_n = (double *) R_alloc(n, sizeof(double));
     double *tmp_n_parent = (double *) R_alloc(n, sizeof(double));               // BJ
-    double *tmp_n2 = NULL;
-    double *tmp_m = NULL;
     double *tmp_zero = (double *) R_alloc(n, sizeof(double));                   // BJ
     zeros(tmp_zero, n);                                                         // BJ
     
@@ -394,6 +395,11 @@ extern "C" {
             root = false;                                                       // BJ
             ParentIndx = which(1, &adjvec[q*MeIndx], q);                        // BJ
 
+            crossphiUnifa = std::min(phi[MeIndx], phi[ParentIndx]);             // BJ
+            crossphiUnifb = std::max(phi[MeIndx], phi[ParentIndx]);             // BJ
+            logPriorJacobianCurrent += log(crossphi[MeIndx-1] - crossphiUnifa) +// BJ
+              log(crossphiUnifb - crossphi[MeIndx-1]);                          // BJ
+            
             crossnu = 0.5*nu[MeIndx] + 0.5*nu[ParentIndx];                      // BJ
             rhoUnifb = rholim(crossphi[MeIndx-1], phi[MeIndx], phi[ParentIndx],
                               nu[MeIndx], nu[ParentIndx], crossnu);             // BJ
@@ -401,11 +407,7 @@ extern "C" {
             // std::cout << "(rhoUnifa, rhoUnifb): " << rhoUnifa << ", " << rhoUnifb << "\n";
             logPriorJacobianCurrent += log(rho[MeIndx-1] - rhoUnifa) +          // BJ
               log(rhoUnifb - rho[MeIndx-1]);                                    // BJ
-
-            crossphiUnifa = std::min(phi[MeIndx], phi[ParentIndx]);             // BJ
-            crossphiUnifb = std::max(phi[MeIndx], phi[ParentIndx]);             // BJ
-            logPriorJacobianCurrent += log(crossphi[MeIndx-1] - crossphiUnifa) +// BJ
-              log(crossphiUnifb - crossphi[MeIndx-1]);                          // BJ
+            
           }                                                                     // BJ
 
           logPriorJacobianCurrent += log(phi[MeIndx] - phiUnifa[MeIndx]) + log(phiUnifb[MeIndx] - phi[MeIndx]);
@@ -462,7 +464,7 @@ extern "C" {
           F77_NAME(dcopy)(&p, betaj, &inc, &beta[p*MeIndx], &inc);
           // std::cout << "beta " << betaj[0] << ", " << betaj[1] << "\n";
 
-          F77_NAME(dgemv)(ntran, &n, &p, &one, X, &n, &beta[p*MeIndx], &inc, &zero, tmp_n, &inc FCONE);
+          F77_NAME(dgemv)(ntran, &n, &p, &one, X, &n, betaj, &inc, &zero, tmp_n, &inc FCONE);
           F77_NAME(daxpy)(&n, &negOne, &y[n*MeIndx], &inc, tmp_n, &inc);
           F77_NAME(dgemv)(ntran, &n, &p, &one, X, &n, &beta[p*ParentIndx], &inc, &zero, tmp_n_parent, &inc FCONE);
           F77_NAME(daxpy)(&n, &negOne, &y[n*ParentIndx], &inc, tmp_n_parent, &inc);
@@ -474,7 +476,7 @@ extern "C" {
           mvrnorm(beta2j, tmp_p2, tmp_pp, p);
           F77_NAME(dcopy)(&p, beta2j, &inc, &beta2[p*MeIndx], &inc);
 
-          F77_NAME(dgemv)(ntran, &n, &p, &one, X, &n, &beta2[p*MeIndx], &inc, &zero, tmp_n, &inc FCONE);
+          F77_NAME(dgemv)(ntran, &n, &p, &one, X, &n, beta2j, &inc, &zero, tmp_n, &inc FCONE);
           F77_NAME(daxpy)(&n, &negOne, &y[n*MeIndx], &inc, tmp_n, &inc);
           F77_NAME(dgemv)(ntran, &n, &p, &one, X, &n, &beta2[p*ParentIndx], &inc, &zero, tmp_n_parent, &inc FCONE);
           F77_NAME(daxpy)(&n, &negOne, &y[n*ParentIndx], &inc, tmp_n_parent, &inc);
@@ -486,9 +488,9 @@ extern "C" {
         QCurrent = QCurrent2;                                                   // BJ
         F77_NAME(dcopy)(&pq, beta2, &inc, beta, &inc);                          // BJ
       }
-      // Rprintf("\tlogDet=%f\n", logDetCurrent);                                    // BJ
-      // Rprintf("\tQ=%f\n", QCurrent);                                              // BJ
-      // std::cout << "beta: (" << beta[0] << ", " << beta[1] << ", " << beta[2] << ", " << beta[3] << ", " << beta[4] << ", " << beta[5] << ")" << "\n";
+      // Rprintf("At %ith iteration,\n \tlogDet=%f\n", s, logDetCurrent);            // BJ
+      // Rprintf("\tQ=%f\n", QCurrent);                                            // BJ
+      // Rprintf("\tbeta[0]=%f\n", beta[0]);                                       // BJ
 
       /////////////////////
       // BJ: update theta
@@ -518,6 +520,14 @@ extern "C" {
           root = false;                                                         // BJ
           ParentIndx = which(1, &adjvec[q*MeIndx], q);                          // BJ
 
+          crossphiUnifa = std::min(phi[MeIndx], phi[ParentIndx]);               // BJ
+          crossphiUnifb = std::max(phi[MeIndx], phi[ParentIndx]);               // BJ
+          crossphiCandUnifa = std::min(phiCand[MeIndx], phiCand[ParentIndx]);   // BJ
+          crossphiCandUnifb = std::max(phiCand[MeIndx], phiCand[ParentIndx]);   // BJ          
+          
+          crossphiCand[MeIndx-1] = logitInv(rnorm(logit(crossphi[MeIndx-1], crossphiUnifa, crossphiUnifb),
+                                                  crossphiTuning[MeIndx-1]), crossphiCandUnifa, crossphiCandUnifb); // BJ
+          
           crossnu = 0.5*nu[MeIndx] + 0.5*nu[ParentIndx];                      // BJ
           rhoUnifb = rholim(crossphi[MeIndx-1], phi[MeIndx], phi[ParentIndx],
                             nu[MeIndx], nu[ParentIndx], crossnu);             // BJ
@@ -539,18 +549,11 @@ extern "C" {
 
           rhoCand[MeIndx-1] = logitInv(rnorm(logit(rho[MeIndx-1], rhoUnifa, rhoUnifb), rhoTuning[MeIndx-1]), rhoCandUnifa, rhoCandUnifb);
 
-          crossphiUnifa = std::min(phi[MeIndx], phi[ParentIndx]);               // BJ
-          crossphiUnifb = std::max(phi[MeIndx], phi[ParentIndx]);               // BJ
-          crossphiCandUnifa = std::min(phiCand[MeIndx], phiCand[ParentIndx]);   // BJ
-          crossphiCandUnifb = std::max(phiCand[MeIndx], phiCand[ParentIndx]);   // BJ          
-
-          crossphiCand[MeIndx-1] = logitInv(rnorm(logit(crossphi[MeIndx-1], crossphiUnifa, crossphiUnifb),
-                                                  crossphiTuning[MeIndx-1]), crossphiCandUnifa, crossphiCandUnifb); // BJ
-
-          logPriorJacobianCand += log(rhoCand[MeIndx-1] - rhoCandUnifa) +       // BJ
-            log(rhoCandUnifb - rhoCand[MeIndx-1]);                              // BJ
           logPriorJacobianCand += log(crossphiCand[MeIndx-1] - crossphiCandUnifa) +// BJ
             log(crossphiCandUnifb - crossphiCand[MeIndx-1]);                    // BJ
+          
+          logPriorJacobianCand += log(rhoCand[MeIndx-1] - rhoCandUnifa) +       // BJ
+            log(rhoCandUnifb - rhoCand[MeIndx-1]);                              // BJ
         }                                                                       // BJ
 
         logPriorJacobianCand += log(phiCand[MeIndx] - phiUnifa[MeIndx]) +
@@ -588,9 +591,9 @@ extern "C" {
       }
 
       logPostCand = -0.5*logDetCand - 0.5*QCand + logPriorJacobianCand;         // BJ
-      // Rprintf("\tlogDetCand=%f\n", logDetCand);
-      // Rprintf("\tQCand=%f\n", QCand);
-      // Rprintf("\tlogPostCand=%f\n", logPostCand);
+      // Rprintf("\tlogDetCand=%f\n", logDetCand);                                 // BJ
+      // Rprintf("\tQCand=%f\n", QCand);                                           // BJ
+      // Rprintf("\tlogPostCand=%f\n", logPostCand);                               // BJ
 
       if (runif(0.0, 1.0) <= exp(logPostCand - logPostCurrent)) {
         thetaUpdate = true;
@@ -650,7 +653,7 @@ extern "C" {
     
     //make return object
     SEXP result_r, resultName_r;
-    int nResultListObjs = 7;
+    int nResultListObjs = 6;
     if (corName == "matern") { nResultListObjs += 1;}
     
     PROTECT(result_r = allocVector(VECSXP, nResultListObjs)); nProtect++;
