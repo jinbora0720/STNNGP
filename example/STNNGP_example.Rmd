@@ -4,11 +4,11 @@ author: "Bora Jin"
 editor_options:
   chunk_output_type: console
 output:
+  pdf_document:
+    toc: yes
   html_document:
     toc: yes
     toc_float: yes
-  pdf_document:
-    toc: yes
 ---
 
 ```{r setup, include = FALSE}
@@ -34,7 +34,8 @@ Since $T$ is a spanning tree, every node has only one incoming edge except the r
 which has no incoming edge. In some cases, an inter-variable relationship may be known 
 up to a graph, not up to a tree. We then take the known graph's directed minimum spanning tree as $T$ 
 whose edge weights are proportional to the negative of absolute empirical correlation coefficients 
-between variables. 
+between variables. To guarantee existence of a spanning tree, 
+any graphs in consideration should be connected.  
 
 For $nq$-vector $\mathbf{y}(\mathscr{S}) = (y_1(\mathscr{S})^T, \dots, y_q(\mathscr{S}))^T$, 
 we define its joint density as 
