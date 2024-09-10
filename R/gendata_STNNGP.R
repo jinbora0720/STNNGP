@@ -4,7 +4,7 @@ rstnngp <- function(coords,
                                   phi = phi, 
                                   rho = rho,
                                   beta = beta, 
-                                  A = A, 
+                                  adjmat = adjmat, 
                                   n.neighbors = n.neighbors), 
                     seed = seed) {
   # coords: nx2
@@ -13,7 +13,7 @@ rstnngp <- function(coords,
   # sigma.sq: scalar, spatial variability
   # phi: scalar, decay
   # rho: q-1 vector, correlation coefficients
-  # A: qxq adjacency matrix of a spanning tree
+  # adjmat: qxq adjacency matrix of a spanning tree
   
   # set seed
   set.seed(seed)
@@ -24,7 +24,7 @@ rstnngp <- function(coords,
   phi <- params$phi
   rho <- params$rho
   beta <- params$beta
-  A <- params$A
+  A <- params$adjmat
   m <- params$n.neighbors
   
   # ordering
@@ -111,10 +111,10 @@ rstnngp_ns <- function(coords,
                     params = list(tau.sq = tau.sq,
                                   sigma.sq = sigma.sq,
                                   phi = phi, 
-                                  cross_phi = cross_phi,
+                                  cross.phi = cross.phi,
                                   rho = rho,
                                   beta = beta, 
-                                  A = A, 
+                                  adjmat = adjmat, 
                                   n.neighbors = n.neighbors), 
                     seed = seed) {
   # coords: nx2
@@ -123,7 +123,7 @@ rstnngp_ns <- function(coords,
   # sigma.sq: q vector, spatial variability
   # phi: q vector, decay
   # rho: q-1 vector, correlation coefficients
-  # A: qxq adjacency matrix of a spanning tree
+  # adjmat: qxq adjacency matrix of a spanning tree
   
   # set seed
   set.seed(seed)
@@ -132,10 +132,10 @@ rstnngp_ns <- function(coords,
   tau.sq <- params$tau.sq
   sigma.sq <- params$sigma.sq
   phi <- params$phi
-  cross_phi <- params$cross_phi
+  cross.phi <- params$cross.phi
   rho <- params$rho
   beta <- params$beta
-  A <- params$A
+  A <- params$adjmat
   m <- params$n.neighbors
   
   # dimensions
@@ -160,7 +160,7 @@ rstnngp_ns <- function(coords,
     marg_cov[[j]] <- sigma.sq[j]*exp(-phi[j]*D) + diag(tau.sq[j],n)
   }
   for (j in 2:q) {
-    cross_cov[[j-1]] <- rho[j-1]*cross_sigma[j-1]*exp(-cross_phi[j-1]*D)
+    cross_cov[[j-1]] <- rho[j-1]*cross_sigma[j-1]*exp(-cross.phi[j-1]*D)
   }
   
   # covariates
