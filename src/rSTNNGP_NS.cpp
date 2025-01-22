@@ -17,43 +17,14 @@
 # define FCONE
 #endif
 
-// BJ
-double func_tsq(double tsq, double crossphi, double phi, double phiParent,
-                double nu, double nuParent, double crossnu) {
-  return pow(pow(crossphi, 2) + tsq, 2*crossnu+2)/pow(pow(phi, 2) + tsq, nu+1)/pow(pow(phiParent, 2) + tsq, nuParent+1);
-}
-
-// BJ
-double rholim(double crossphi, double phi, double phiParent,
-              double nu, double nuParent, double crossnu) {
-  double tsq = ((2*nu+2)*pow(phiParent,2)*pow(crossphi,2) + (2*nuParent+2)*pow(phi,2)*pow(crossphi,2) - 2*(nu+nuParent+2)*pow(phi,2)*pow(phiParent,2))/
-    ((2*nu+2)*pow(phi,2) + (2*nuParent+2)*pow(phiParent,2) - 2*(nu+nuParent+2)*pow(crossphi,2));
-  
-  // std::cout << "tsq=0: " << func_tsq(0, crossphi, phi, phiParent, nu, nuParent, crossnu) << "\n";
-  // std::cout << "tsq=tsq: " << "(" << tsq << ", " << func_tsq(tsq, crossphi, phi, phiParent, nu, nuParent, crossnu) << ")" << "\n";
-  // std::cout << "tsq=Infty: " << func_tsq(1e+17, crossphi, phi, phiParent, nu, nuParent, crossnu) << "\n";
-  
-  double infimum = std::min(std::min(func_tsq(0, crossphi, phi, phiParent, nu, nuParent, crossnu),
-                                     func_tsq(tsq, crossphi, phi, phiParent, nu, nuParent, crossnu)), // BJ: tsq can be negative. when it is, func_tsq = -nan. excluded for finding the min
-                                     func_tsq(1e+17, crossphi, phi, phiParent, nu, nuParent, crossnu)); // BJ: 1e+17 role of infinity
-  // std::cout << "infimum: " << infimum << "\n";
-  // std::cout << "infimum: " << infimum << "\n";
-  double value = gammafn(nu+1)/gammafn(nu)*gammafn(nuParent+1)/gammafn(nuParent)*
-    pow(gammafn(crossnu),2)/pow(gammafn(crossnu+1),2)*
-    pow(phi,2*nu)*pow(phiParent,2*nuParent)/pow(crossphi,4*crossnu)*infimum;
-  
-  return pow(value, 0.5);
-}
-
-// BJ
-double updateBF_parent(double *B, double *F, double *c, double *C, double *coords,
-                       int *nnIndx, int *nnIndxLU,
-                       int *nnIndxParent, int *nnIndxLUParent, int *nnIndxLUAll,
-                       int n, int m, int twomp1, int twomp1sq,
-                       double sigmaSq, double phi, double nu, double tauSq, 
-                       double sigmaSqParent, double phiParent, double nuParent, 
-                       double tauSqParent, double rho, double crossphi, double crossnu,
-                       int covModel, double nThreads, double nuUnifb, bool root) {
+double updateBF_parent_rNS(double *B, double *F, double *c, double *C, double *coords,
+                           int *nnIndx, int *nnIndxLU,
+                           int *nnIndxParent, int *nnIndxLUParent, int *nnIndxLUAll,
+                           int n, int m, int twomp1, int twomp1sq,
+                           double sigmaSq, double phi, double nu, double tauSq, 
+                           double sigmaSqParent, double phiParent, double nuParent, 
+                           double tauSqParent, double rho, double crossphi, double crossnu,
+                           int covModel, double nThreads, double nuUnifb, bool root) {
   
   int i, k, l;
   int info = 0;
@@ -422,16 +393,16 @@ extern "C" {
           ///////////////////
           // BJ: update beta
           //////////////////
-          logDetCurrent += updateBF_parent(B, F, c, C, coords,
-                                           nnIndx, nnIndxLU,
-                                           nnIndxParent, nnIndxLUParent, nnIndxLUAll,
-                                           n, m, twomp1, twomp1sq,
-                                           sigmaSq[MeIndx], phi[MeIndx],
-                                           nu[MeIndx], tauSq[MeIndx],
-                                           sigmaSq[ParentIndx], phi[ParentIndx],
-                                           nu[ParentIndx], tauSq[ParentIndx],
-                                           rho[MeIndx-1], crossphi[MeIndx-1], crossnu,
-                                           covModel, nThreads, nuUnifb[MeIndx], root);
+          logDetCurrent += updateBF_parent_rNS(B, F, c, C, coords,
+                                               nnIndx, nnIndxLU,
+                                               nnIndxParent, nnIndxLUParent, nnIndxLUAll,
+                                               n, m, twomp1, twomp1sq,
+                                               sigmaSq[MeIndx], phi[MeIndx],
+                                               nu[MeIndx], tauSq[MeIndx],
+                                               sigmaSq[ParentIndx], phi[ParentIndx],
+                                               nu[ParentIndx], tauSq[ParentIndx],
+                                               rho[MeIndx-1], crossphi[MeIndx-1], crossnu,
+                                               covModel, nThreads, nuUnifb[MeIndx], root);
 
           for(i = 0; i < p; i++){
             tmp_p[i] = Q_parent(B, F, &X[n*i], &y[n*MeIndx], tmp_zero, tmp_zero,
@@ -569,17 +540,17 @@ extern "C" {
             log(nuUnifb[MeIndx] - nuCand[MeIndx]);
         }
 
-        logDetCand += updateBF_parent(B, F, c, C, coords,
-                                      nnIndx, nnIndxLU,
-                                      nnIndxParent, nnIndxLUParent, nnIndxLUAll,
-                                      n, m, twomp1, twomp1sq,
-                                      sigmaSqCand[MeIndx], phiCand[MeIndx],
-                                      nuCand[MeIndx], tauSqCand[MeIndx],
-                                      sigmaSqCand[ParentIndx], phiCand[ParentIndx],
-                                      nuCand[ParentIndx], tauSqCand[ParentIndx],
-                                      rhoCand[MeIndx-1], crossphiCand[MeIndx-1], 
-                                      crossnuCand,
-                                      covModel, nThreads, nuUnifb[MeIndx], root);
+        logDetCand += updateBF_parent_rNS(B, F, c, C, coords,
+                                          nnIndx, nnIndxLU,
+                                          nnIndxParent, nnIndxLUParent, nnIndxLUAll,
+                                          n, m, twomp1, twomp1sq,
+                                          sigmaSqCand[MeIndx], phiCand[MeIndx],
+                                          nuCand[MeIndx], tauSqCand[MeIndx],
+                                          sigmaSqCand[ParentIndx], phiCand[ParentIndx],
+                                          nuCand[ParentIndx], tauSqCand[ParentIndx],
+                                          rhoCand[MeIndx-1], crossphiCand[MeIndx-1], 
+                                          crossnuCand,
+                                          covModel, nThreads, nuUnifb[MeIndx], root);
 
         F77_NAME(dgemv)(ntran, &n, &p, &one, X, &n, &beta[p*MeIndx], &inc, &zero, tmp_n, &inc FCONE);
         F77_NAME(daxpy)(&n, &negOne, &y[n*MeIndx], &inc, tmp_n, &inc);

@@ -17,13 +17,13 @@
 # define FCONE
 #endif
 
-double updateBF_parent(double *B, double *F, double *c, double *C, double *coords,
-                       int *nnIndx, int *nnIndxLU,
-                       int *nnIndxParent, int *nnIndxLUParent, int *nnIndxLUAll,
-                       int n, int m, int twomp1, int twomp1sq,
-                       double *theta, int sigmaSqIndx, int phiIndx, int nuIndx,
-                       double tauSq, double tauSqParent, double rho, 
-                       int covModel, double *bk, double nuUnifb, bool root) {
+double updateBF_parent_r(double *B, double *F, double *c, double *C, double *coords,
+                         int *nnIndx, int *nnIndxLU,
+                         int *nnIndxParent, int *nnIndxLUParent, int *nnIndxLUAll,
+                         int n, int m, int twomp1, int twomp1sq,
+                         double *theta, int sigmaSqIndx, int phiIndx, int nuIndx,
+                         double tauSq, double tauSqParent, double rho, 
+                         int covModel, double *bk, double nuUnifb, bool root) {
   
   int i, k, l;
   int info = 0;
@@ -348,13 +348,13 @@ extern "C" {
           // BJ: update beta
           //////////////////
           // BJ: need B and F to update beta
-          logDetCurrent += updateBF_parent(B, F, c, C, coords,
-                                           nnIndx, nnIndxLU,
-                                           nnIndxParent, nnIndxLUParent, nnIndxLUAll,
-                                           n, m, twomp1, twomp1sq,
-                                           theta, sigmaSqIndx, phiIndx, nuIndx,
-                                           tauSq[MeIndx], tauSq[ParentIndx], rho[MeIndx-1], 
-                                           covModel, bk, nuUnifb, root);
+          logDetCurrent += updateBF_parent_r(B, F, c, C, coords,
+                                             nnIndx, nnIndxLU,
+                                             nnIndxParent, nnIndxLUParent, nnIndxLUAll,
+                                             n, m, twomp1, twomp1sq,
+                                             theta, sigmaSqIndx, phiIndx, nuIndx,
+                                             tauSq[MeIndx], tauSq[ParentIndx], rho[MeIndx-1], 
+                                             covModel, bk, nuUnifb, root);
           
           for(i = 0; i < p; i++){
             tmp_p[i] = Q_parent(B, F, &X[n*i], &y[n*MeIndx], tmp_zero, tmp_zero,
@@ -466,14 +466,14 @@ extern "C" {
           ParentIndx = which(1, &adjvec[q*MeIndx], q);                            // BJ
         }                                                                         // BJ
         
-        logDetCand += updateBF_parent(B, F, c, C, coords,
-                                      nnIndx, nnIndxLU,
-                                      nnIndxParent, nnIndxLUParent, nnIndxLUAll,
-                                      n, m, twomp1, twomp1sq,
-                                      thetaCand, sigmaSqIndx, phiIndx, nuIndx,
-                                      tauSqCand[MeIndx], tauSqCand[ParentIndx], 
-                                      rhoCand[MeIndx-1], 
-                                      covModel, bk, nuUnifb, root);
+        logDetCand += updateBF_parent_r(B, F, c, C, coords,
+                                        nnIndx, nnIndxLU,
+                                        nnIndxParent, nnIndxLUParent, nnIndxLUAll,
+                                        n, m, twomp1, twomp1sq,
+                                        thetaCand, sigmaSqIndx, phiIndx, nuIndx,
+                                        tauSqCand[MeIndx], tauSqCand[ParentIndx], 
+                                        rhoCand[MeIndx-1], 
+                                        covModel, bk, nuUnifb, root);
         
         F77_NAME(dgemv)(ntran, &n, &p, &one, X, &n, &beta[p*MeIndx], &inc, &zero, tmp_n, &inc FCONE);
         F77_NAME(daxpy)(&n, &negOne, &y[n*MeIndx], &inc, tmp_n, &inc);
@@ -550,7 +550,7 @@ extern "C" {
     
     //make return object
     SEXP result_r, resultName_r;
-    int nResultListObjs = 5;
+    int nResultListObjs = 4;
     
     PROTECT(result_r = allocVector(VECSXP, nResultListObjs)); nProtect++;
     PROTECT(resultName_r = allocVector(VECSXP, nResultListObjs)); nProtect++;
