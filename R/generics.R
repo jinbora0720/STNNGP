@@ -496,7 +496,7 @@ predict.STNNGP <- function(object, X.0, coords.0, sub.sample, n.omp.threads = 1,
   if (family.indx == 1) {
     p.tausq.samples <- t(p.tausq.samples[s.indx,,drop=FALSE])                   # BJ
   } else {
-    p.tausq.samples <- matrix(NA, nrow = q, ncol = n.samples)                   # BJ
+    p.tausq.samples <- matrix(0, nrow = q, ncol = n.samples)                   # BJ
   }
   p.rho.samples <- t(p.rho.samples[s.indx,,drop=FALSE])                         # BJ
   if (out$mv.model == "separable") {                                            # BJ

@@ -837,7 +837,7 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response",
   out$p.beta.samples <- mcmc(t(out$p.beta.samples))
   if (family == "gaussian") {
     out$p.tausq.samples <- mcmc(t(out$p.tausq.samples))
-  }
+  } 
   out$p.rho.samples <- mcmc(t(out$p.rho.samples))
   if (mv.model == "separable") {                                                # BJ
     out$p.theta.samples <- mcmc(t(out$p.theta.samples))
@@ -900,12 +900,17 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response",
 
   if(method == "latent"){
     out$p.w.samples <- out$p.w.samples[rep(0:(q-1)*n, each = n)+order(ord),,drop=FALSE] # BJ
-    if (misalign) {
-      p.ypred.samples <- (diag(q)%x%out$X)%*%t(out$p.beta.samples) + 
-        out$p.w.samples + 
-        bind_rows(replicate(n, data.frame(sqrt(t(out$p.tausq.samples))), simplify = FALSE))*
-        matrix(rnorm(n*q), nrow = n*q, ncol = n.samples)                        # BJ: posterior predictive sample
-      out$p.ypred.samples <- as.matrix(p.ypred.samples)
+    if (misalign) {                                                             # BJ: posterior predictive sample
+      if (family == "gaussian") {
+        p.ypred.samples <- (diag(q)%x%out$X)%*%t(out$p.beta.samples) + 
+          out$p.w.samples + 
+          bind_rows(replicate(n, data.frame(sqrt(t(out$p.tausq.samples))), simplify = FALSE))*
+          matrix(rnorm(n*q), nrow = n*q, ncol = n.samples)                      
+        out$p.ypred.samples <- as.matrix(p.ypred.samples)
+      } else {
+        p.psi.samples <- (diag(q)%x%out$X)%*%t(out$p.beta.samples) + out$p.w.samples
+        out$p.ypred.samples <- 1/(1+exp(-p.psi.samples))
+      }
     }
   }
 
