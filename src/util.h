@@ -34,13 +34,24 @@ double spCor(double &D, double &phi, double &nu, int &covModel, double *bk);
 int which(int a, int *b, int n);
 
 double Q(double *B, double *F, double *u, double *v, int n, int *nnIndx, int *nnIndxLU);
-double Q_parent(double *B, double *F, double *u, double *v, 
-                double *uParent, double *vParent,
-                int n, int *nnIndx, int *nnIndxLU, 
-                int *nnIndxParent, int *nnIndxLUParent, int *nnIndxLUAll, 
-                bool root);                                                     // BJ
   
 void printMtrx(double *m, int nRow, int nCol);
 
 void printMtrxInt(int *m, int nRow, int nCol);
 
+//////////////////////////
+// BJ: added for STNNGP //
+//////////////////////////
+double Q_parent(double *B, double *F, double *u, double *v, 
+                double *uParent, double *vParent,
+                int n, int *nnIndx, int *nnIndxLU, 
+                int *nnIndxParent, int *nnIndxLUParent, int *nnIndxLUAll, 
+                bool root);                                                     
+
+double func_tsq(double tsq, double crossphi, double phi, double phiParent,
+                double nu, double nuParent, double crossnu);                    
+
+double rholim(double crossphi, double phi, double phiParent,
+              double nu, double nuParent, double crossnu);                      
+
+void mkuUIndx2(int n, int m, int* nnIndxParent, int *nnIndxLUParent, int* uuIndx, int* uuIndxLU);

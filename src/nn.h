@@ -33,3 +33,10 @@ void fastNN(int m, int n, double *coords, int ui, double *u, int *sIndx, int *rS
 extern "C" {
   SEXP mkNNIndxCB(SEXP n_r, SEXP m_r, SEXP coords_r, SEXP nnIndx_r, SEXP nnDist_r, SEXP nnIndxLU_r, SEXP nThreads_r);
 }
+
+///////////////////////////////////////////////////////////////////
+// BJ: u index (among undirected neighbors)
+///////////////////////////////////////////////////////////////////
+extern "C" {
+  SEXP mkuUIndx(SEXP n_r, SEXP m_r, SEXP nnIndxParent_r, SEXP uuIndx_r, SEXP uuIndxLU_r, SEXP uuiIndx_r, SEXP nnIndxLUParent_r);
+}

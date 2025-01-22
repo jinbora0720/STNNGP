@@ -1,6 +1,7 @@
 #define USE_FC_LEN_T
 #include <string>
 #include <limits>
+#include <iostream>
 #include "util.h"
 
 #ifdef _OPENMP
@@ -107,7 +108,6 @@ void mkUIndx1(int n, int m, int* nnIndx, int* uIndx, int* uIndxLU){
   }
 }
 
-
 void mkUIndx2(int n, int m, int* nnIndx, int *nnIndxLU, int* uIndx, int* uIndxLU){ 
 
   int i, j, k;
@@ -140,21 +140,21 @@ void mkUIndx2(int n, int m, int* nnIndx, int *nnIndxLU, int* uIndx, int* uIndxLU
   
 }
 
-
 void crs_csc(int n, int *i_A, int *j_A, int *i_B, int *j_B){
 
   int i, j, col, cumsum, temp, row, dest, last;
   
   int nnz = i_A[n];
 
+  // BJ: i_B = number of times the ith location is selected as a neighbor
   for(i = 0; i < n; i++){
     i_B[i] = 0;
   }
-  
   for(i = 0; i < nnz; i++){            
     i_B[j_A[i]]++;
   }
   
+  // BJ: i_B = cumsum of [0, i_B[0:(n-1)]]
   //cumsum the nnz per column to get i_B[]
   for(col = 0, cumsum = 0; col < n; col++){     
     temp  = i_B[col];
@@ -179,11 +179,6 @@ void crs_csc(int n, int *i_A, int *j_A, int *i_B, int *j_B){
     last = temp;
   }
 } 
-
-
-
-
-
 
 std::string getCorName(int i){
 
@@ -275,7 +270,36 @@ double Q(double *B, double *F, double *u, double *v, int n, int *nnIndx, int *nn
   return(q);
 }
 
-// BJ 
+void printMtrx(double *m, int nRow, int nCol){
+
+  int i, j;
+
+  for(i = 0; i < nRow; i++){
+    Rprintf("\t");
+    for(j = 0; j < nCol; j++){
+      Rprintf("%.10f\t", m[j*nRow+i]);
+    }
+    Rprintf("\n");
+  }
+}
+
+void printMtrxInt(int *m, int nRow, int nCol){
+
+  int i, j;
+
+  for(i = 0; i < nRow; i++){
+    Rprintf("\t");
+    for(j = 0; j < nCol; j++){
+      Rprintf("%i\t", m[j*nRow+i]);
+    }
+    Rprintf("\n");
+  }
+
+}
+
+//////////////////////////
+// BJ: added for STNNGP //
+//////////////////////////
 double Q_parent(double *B, double *F, double *u, double *v, 
                 double *uParent, double *vParent,
                 int n, int *nnIndx, int *nnIndxLU, 
@@ -320,30 +344,47 @@ double Q_parent(double *B, double *F, double *u, double *v,
   return(Q);
 }
 
-void printMtrx(double *m, int nRow, int nCol){
+double func_tsq(double tsq, double crossphi, double phi, double phiParent,
+                double nu, double nuParent, double crossnu) {
+  return pow(pow(crossphi, 2) + tsq, 2*crossnu+2)/pow(pow(phi, 2) + tsq, nu+1)/pow(pow(phiParent, 2) + tsq, nuParent+1);
+}
 
-  int i, j;
+double rholim(double crossphi, double phi, double phiParent,
+              double nu, double nuParent, double crossnu) {
+  double tsq = ((2*nu+2)*pow(phiParent,2)*pow(crossphi,2) + (2*nuParent+2)*pow(phi,2)*pow(crossphi,2) - 2*(nu+nuParent+2)*pow(phi,2)*pow(phiParent,2))/
+    ((2*nu+2)*pow(phi,2) + (2*nuParent+2)*pow(phiParent,2) - 2*(nu+nuParent+2)*pow(crossphi,2));
+  double infimum = std::min(std::min(func_tsq(0, crossphi, phi, phiParent, nu, nuParent, crossnu),
+                                     func_tsq(tsq, crossphi, phi, phiParent, nu, nuParent, crossnu)), // BJ: tsq can be negative. when it is, func_tsq = -nan. excluded for finding the min
+                                     func_tsq(1e+17, crossphi, phi, phiParent, nu, nuParent, crossnu)); // BJ: 1e+17 role of infinity
+  double value = gammafn(nu+1)/gammafn(nu)*gammafn(nuParent+1)/gammafn(nuParent)*
+    pow(gammafn(crossnu),2)/pow(gammafn(crossnu+1),2)*
+    pow(phi,2*nu)*pow(phiParent,2*nuParent)/pow(crossphi,4*crossnu)*infimum;
+  
+  return pow(value, 0.5);
+}
 
-  for(i = 0; i < nRow; i++){
-    Rprintf("\t");
-    for(j = 0; j < nCol; j++){
-      Rprintf("%.10f\t", m[j*nRow+i]);
-    }
-    Rprintf("\n");
+void mkuUIndx2(int n, int m, int* nnIndxParent, int *nnIndxLUParent, int* uuIndx, int* uuIndxLU){
+
+  int i, j, k;
+  int nIndx = static_cast<int>(static_cast<double>(m+1)*n);
+
+  int *i_nnIndx = new int[n+1];
+  int *i_A_csc = new int[n+1];
+  
+  for(k = 0; k < n+1; k++){
+    i_nnIndx[k] = (m+1)*k;
   }
+  
+  crs_csc(n, i_nnIndx, nnIndxParent, i_A_csc, uuIndx);
+  
+  for(i = 0; i < n; i++){
+    uuIndxLU[i] = i_A_csc[i];
+    uuIndxLU[i+n] = i_A_csc[i+1]-i_A_csc[i];
+  }
+  
+  delete[] i_nnIndx;
+  delete[] i_A_csc;
 }
 
 
-void printMtrxInt(int *m, int nRow, int nCol){
 
-  int i, j;
-
-  for(i = 0; i < nRow; i++){
-    Rprintf("\t");
-    for(j = 0; j < nCol; j++){
-      Rprintf("%i\t", m[j*nRow+i]);
-    }
-    Rprintf("\n");
-  }
-
-}

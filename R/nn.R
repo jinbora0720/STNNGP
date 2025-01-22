@@ -74,3 +74,28 @@ mkNNIndxCB <- function(coords, m, n.omp.threads=1){
     
     list("run.time"=run.time, "nnIndx"=as.integer(nnIndx), "nnDist"=as.double(nnDist), "nnIndxLU"=nnIndxLU)
 }
+
+# BJ: u index (among undirected neighbors)
+mkuUIndx <- function(n, m, nn.indx.parent, nn.indx.lu.parent){
+    
+    n.indx <- (m+1)*n
+    uu.indx <- rep(0, n.indx)
+    uu.indx.lu <- rep(0, 2*n)
+    uui.indx <- rep(0, n.indx)
+    
+    storage.mode(n) <- "integer"
+    storage.mode(m) <- "integer"
+    storage.mode(nn.indx.parent) <- "integer"
+    storage.mode(uu.indx) <- "integer"
+    storage.mode(uu.indx.lu) <- "integer"
+    storage.mode(uui.indx) <- "integer"
+    storage.mode(nn.indx.lu.parent) <- "integer"
+    
+    ptm <- proc.time()
+    
+    out <- .Call("mkuUIndx", n, m, nn.indx.parent, uu.indx, uu.indx.lu, uui.indx, nn.indx.lu.parent)
+    
+    run.time <- proc.time() - ptm
+    
+    list("run.time"=run.time, "uu.indx"=as.integer(uu.indx), "uu.indx.lu"=as.integer(uu.indx.lu), "uui.indx"=as.integer(uui.indx))
+}

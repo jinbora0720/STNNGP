@@ -4,8 +4,6 @@ author: "Bora Jin"
 editor_options:
   chunk_output_type: console
 output:
-  pdf_document:
-    toc: yes
   html_document:
     toc: yes
     toc_float: yes
@@ -32,7 +30,7 @@ In following examples, we arbitrarily choose the first variable to be the root a
 have $E_T = \{(j \rightarrow k) : k=2,\dots,q\}$ as the set of directed edges from $T$. 
 Since $T$ is a spanning tree, every node has only one incoming edge except the root
 which has no incoming edge. In some cases, an inter-variable relationship may be known 
-up to a graph, not up to a tree. We then take the known graph's directed minimum spanning tree as $T$ 
+up to a graph, not up to a tree. We then take the known graph's directed minimum spanning tree as $T$
 whose edge weights are proportional to the negative of absolute empirical correlation coefficients 
 between variables. To guarantee existence of a spanning tree, 
 any graphs in consideration should be connected.  
@@ -49,10 +47,13 @@ with some base density $f$ where $N_d(\mathbf{s}_i) \subset \{\mathbf{s}_1,\dots
 $N(\mathbf{s}_i) \subset \mathscr{S}\setminus \{\mathbf{s}_i\}$ are a directed and 
 an undirected nearest neighbor set of $\mathbf{s}_i$ by Euclidean distance, respectively. 
 
-An STNNGP model assumes 
-\[\mathbf{y}(\mathscr{S}) \sim N((I_q\otimes X)\mathbf{\beta}_L, \Sigma+diag(\tau_1^2,\dots,\tau_q^2)\otimes I_n),\] at observed locations $\mathscr{S}$, where $X$ is a $n\times p$ matrix of covariates,
+An STNNGP model assumes a latent variable $w(\cdot)$ to be 
+\[\mathbf{w}(\mathscr{S}) \sim N(0, \Sigma),\] at observed locations $\mathscr{S}$ 
+for a spatial covariance matrix $\Sigma$.
+Marginalizing over $\mathbf{w}$ we obtain
+\[\mathbf{y}(\mathscr{S}) \sim N((I_q\otimes X)\mathbf{\beta}_L, \Sigma+diag(\tau_1^2,\dots,\tau_q^2)\otimes I_n),\], where $X$ is a $n\times p$ matrix of covariates,
 $\mathbf{\beta}_L = (\mathbf{\beta}_1^T, \dots, \mathbf{\beta}_q^T)^T$ is a $pq$-vector of coefficients, 
-and $\Sigma+diag(\tau_1^2,\dots,\tau_q^2)\otimes I_n$ is a spatial covariance matrix 
+and $\Sigma+diag(\tau_1^2,\dots,\tau_q^2)\otimes I_n$ is the spatial covariance matrix 
 with variable-specific nuggets. 
 
 The package `STNNGP` implements a separable and a nonseparable model; 
@@ -71,8 +72,9 @@ for conditions to be a valid bivariate Matern model.
 
 ### Package illustration
 
-This document presents model fitting and results of STNNGP response models using 
-the package `STNNGP`. 
+This document presents model fitting and results of STNNGP latent models using 
+the package `STNNGP`. In order to fit STNNGP response model, one can simply use 
+`method = "response"`.
 We start with loading necessary packages: 
 
 ```{r load-package}
@@ -83,34 +85,35 @@ library(igraph)
 library(STNNGP)
 ```
 
-We first generate data from a separable STNNGP model and fit using a function `STNNGP`.
+We first generate data from a separable STNNGP model and fit it using a function `STNNGP`.
 Tuning parameters are pre-tuned so that overall Metropolis acceptance rate is around 30%. 
 
 ```{r rstnngp}
 # set seed 
-seed <- 20240720
+seed <- 20241107
 set.seed(seed)
 
 # create coordinates on a grid 
-coords <- expand.grid(seq(0, 1, length = 20), 
-                      seq(0, 1, length = 20)) %>% 
+coords <- expand.grid(seq(0, 1, length = 30), 
+                      seq(0, 1, length = 30)) %>% 
   arrange(Var1) %>%                                                             
   as.matrix() 
+n <- nrow(coords)
 
 # parameters 
 ## number of neighbors
 m <- 15
 
 ## covariance
-q <- 5
-tau.sq <- seq(0.01, 0.05, length = q)
+q <- 6
+tau.sq <- sample(seq(0.01, 0.05, length = q), replace = T)
 rho <- runif(q-1, -1, 1)
-sigma.sq <- 3
-phi <- 3/0.5
+sigma.sq <- 1
+phi <- 3/0.8
 
 ## coefficients for covariates
 p <- 2
-beta <- matrix(runif(p*q, -0.5, 3), p, q)
+beta <- matrix(runif(p*q, -1, 2), p, q)
 
 ## spanning tree
 A <- matrix(0, q, q)
@@ -121,16 +124,17 @@ T0 <- graph_from_adjacency_matrix(A, "undirected")
 plot(T0, layout = layout_as_tree(T0, root = 1), main = "Spanning Tree")
 
 # fitting parameters
+verbose <- FALSE
 n.threads <- 15
 burn <- 1000
 thin <- 2
 save <- 1000
 n.samples <- burn + thin*save
-starting <- list("beta" = beta, "phi" = phi, "sigma.sq" = sigma.sq, 
-                 "tau.sq" = tau.sq, "adjmat" = A, "rho" = rho)
-tuning <- list("phi" = 0.08, "sigma.sq" = 0.08, 
-               "tau.sq" = ifelse(tau.sq/10 < 0.004, tau.sq/10, 0.004), 
-               "rho" = ifelse(abs(rho)/10 < 0.05, abs(rho)/10, 0.05))           # for ~35% of acceptance rate
+starting_latent <- list("beta" = beta, "phi" = phi, "sigma.sq" = sigma.sq, 
+                        "tau.sq" = tau.sq, "adjmat" = A, "rho" = rho)
+tuning <- list("phi" = 0.1, "rho" = rep(0.07, q-1),                               
+               "sigma.sq" = 0.01, "tau.sq" = tau.sq/10)                         
+tuning_latent <- list("phi" = 0.1, "rho" = rep(0.06, q-1))                     # ~35% overall acceptance rate
 priors <- list("phi.Unif" = c(3/1, 3/0.3), "sigma.sq.IG" = c(2, sigma.sq), 
                "tau.sq.IG" = cbind(2, tau.sq))
 cov.model <- "exponential"
@@ -140,23 +144,27 @@ cov.model <- "exponential"
 set.seed(seed)
 
 # number of replicates 
-reps <- 15
+reps <- 5
 
 # set seeds for replicates 
 seeds <- sample(100, reps)
 
 # save results 
-betas <- matrix(0, reps, p*q)
-tau.sqs <- matrix(0, reps, q)
-sigma.sqs <- rep(0, reps)
-phis <- rep(0, reps)
-ssqphis <- rep(0, reps)
-rhos <- matrix(0, reps, q-1)
-telapsed <- rep(0, reps)
+betas <- matrix(0, reps, (p+1)*q)
+betas_latent <- matrix(0, reps, p*q)
+tau.sqs = tau.sqs_latent <- matrix(0, reps, q)
+sigma.sqs = sigma.sqs_latent <- rep(0, reps)
+phis = phis_latent <- rep(0, reps)
+ssqphis = ssqphis_latent <- rep(0, reps)
+rhos = rhos_latent <- matrix(0, reps, q-1)
+mses_latent <- rep(0, reps)
+telapsed = telapsed_latent <- rep(0, reps)
 
 for (i in 1:reps) {
   seed <- seeds[i]
   data <- rstnngp(coords, 
+                  family = "gaussian",
+                  mv.model = "separable",
                   params = list(tau.sq = tau.sq,
                                 sigma.sq = sigma.sq,
                                 phi = phi, 
@@ -165,16 +173,24 @@ for (i in 1:reps) {
                                 adjmat = A, 
                                 n.neighbors = m), 
                   seed = seed)
-                
-  out <- STNNGP(data$Y ~ data$X-1,
-                coords = coords, method = "response",
+  beta0 <- data$W %>% colMeans()
+  starting <- list("beta" = rbind(beta0, beta), "phi" = phi, "sigma.sq" = sigma.sq,
+                   "tau.sq" = tau.sq, "adjmat" = A, "rho" = rho)
+
+  out <- STNNGP(Y ~ X,
+                data = data,
+                coords = coords,
+                mv.model = "separable",
+                method = "response",
                 n.neighbors = m,
-                starting = starting, tuning = tuning, priors = priors,
+                starting = starting,
+                tuning = tuning,
+                priors = priors,
                 cov.model = cov.model,
                 n.samples = n.samples,
                 n.omp.threads = n.threads,
-                verbose = FALSE)
-  
+                verbose = verbose)
+
   betas[i,] <- out$p.beta.samples[burn+thin*1:save,] %>% colMeans()
   tau.sqs[i,] <- out$p.tausq.samples[burn+thin*1:save,] %>% colMeans()
   sigma.sqs[i] <- out$p.theta.samples[burn+thin*1:save,1] %>% mean()
@@ -183,11 +199,41 @@ for (i in 1:reps) {
                    out$p.theta.samples[burn+thin*1:save,2]) %>% mean()
   rhos[i,] <- out$p.rho.samples[burn+thin*1:save,] %>% colMeans()
   telapsed[i] <- out$run.time[3]
+
+  out_latent <- STNNGP(Y ~ X-1,
+                       data = data,
+                       coords = coords,
+                       mv.model = "separable",
+                       method = "latent",
+                       n.neighbors = m,
+                       starting = starting_latent,
+                       tuning = tuning_latent,
+                       priors = priors,
+                       cov.model = cov.model,
+                       n.samples = n.samples,
+                       n.omp.threads = n.threads,
+                       verbose = verbose)
+
+  betas_latent[i,] <- out_latent$p.beta.samples[burn+thin*1:save,] %>% colMeans()
+  tau.sqs_latent[i,] <- out_latent$p.tausq.samples[burn+thin*1:save,] %>% colMeans()
+  sigma.sqs_latent[i] <- out_latent$p.theta.samples[burn+thin*1:save,1] %>% mean()
+  phis_latent[i] <- out_latent$p.theta.samples[burn+thin*1:save,2] %>% mean()
+  ssqphis_latent[i] <- (out_latent$p.theta.samples[burn+thin*1:save,1]*
+                   out_latent$p.theta.samples[burn+thin*1:save,2]) %>% mean()
+  rhos_latent[i,] <- out_latent$p.rho.samples[burn+thin*1:save,] %>% colMeans()
+  what <- out_latent$p.w.samples[,burn+thin*1:save] %>% rowMeans() %>% matrix(., n, q)
+  mses_latent[i] <- mean(c(data$W - what)^2)
+  telapsed_latent[i] <- out_latent$run.time[3]
 }
 ```
 
-```{r STNNGP_res, echo = FALSE, out.width = "100%", fig.height = 6.5}
-params_est <- cbind(betas, tau.sqs, sigma.sqs, phis, ssqphis, rhos, telapsed) %>% 
+```{r STNNGP_res, echo = FALSE, fig.width = 9, fig.height = 10}
+params_est <- cbind(matrix(betas[,-c(1+(p+1)*0:(q-1))], ncol = p*q), tau.sqs, sigma.sqs, 
+                    phis, ssqphis, rhos, telapsed) %>% 
+  as.data.frame()
+params_est_latent <- cbind(betas_latent, tau.sqs_latent, sigma.sqs_latent, 
+                           phis_latent, ssqphis_latent, rhos_latent, 
+                           mses_latent, telapsed_latent) %>% 
   as.data.frame()
 params_true <- c(c(beta), tau.sq, sigma.sq, phi, sigma.sq*phi, rho) %>% 
   matrix(., nrow = 1) %>% 
@@ -195,45 +241,69 @@ params_true <- c(c(beta), tau.sq, sigma.sq, phi, sigma.sq*phi, rho) %>%
 col_labels <- c(paste0("beta[",1:(p*q),"]"), 
                 paste0("tau[",1:q,"]^2"), 
                 "sigma^2", "phi", "sigma^2*phi", 
-                paste0("rho[",apply(A[,2:q], 2, function(x) which(x==1)),2:q,"]"),
-                "time (secs)")
-                          
-colnames(params_est) <- col_labels
-colnames(params_true) <- col_labels[-length(col_labels)]
-params_est_long <- params_est %>% pivot_longer(everything(), names_to = "var") 
+                paste0("rho[",apply(A[,2:q], 2, function(x) which(x==1)),2:q,"]"))
+
+colnames(params_est) <- c(col_labels, "time (secs)")
+colnames(params_est_latent) <- c(col_labels, "mse", "time (secs)")
+colnames(params_true) <- col_labels
+
+params_est_long <- params_est %>% 
+  pivot_longer(everything(), names_to = "var") %>% 
+  mutate(method = "response")
+params_est_long_latent <- params_est_latent %>% 
+  pivot_longer(everything(), names_to = "var") %>% 
+  mutate(method = "latent")
 params_true_long <- params_true %>% pivot_longer(everything(), names_to = "var") 
 params_est_long %>%
-  ggplot(aes(y = value)) + 
-  facet_wrap(~factor(var, levels = col_labels), 
+  bind_rows(params_est_long_latent) %>% 
+  ggplot(aes(y = value, x = method)) + 
+  facet_wrap(~factor(var, levels = c(col_labels, "mse", "time (secs)")), 
              labeller = label_parsed, scales = "free") +
   geom_boxplot(fill = "gray90") +
   geom_hline(data = params_true_long, aes(yintercept = value), 
              color = "red", linetype = "dashed") + 
   labs(y = "", x = "", title = "Parameter estimates over replicates") +
-  theme(axis.title.x = element_blank(),
-        axis.text.x = element_blank(),
-        axis.ticks.x = element_blank())
+  scale_x_discrete(guide = guide_axis(angle = 30))
 ```
 
-We next run a nonseparable STNNGP simulation using a function `STNNGP_NS`.
+Here we observe that $\tau^2_j$'s tend to be slightly more accurately estimated with less standard errors in the response model where nuggets are updated via Metropolis than in the latent model where nuggets updated via Gibbs sampling. In this separable scenario, the latent model ($\sim$ `r round(mean(telapsed_latent), 1)` secs) takes `r round(mean(telapsed_latent)/mean(telapsed), 1)` times longer than the response model ($\sim$ `r round(mean(telapsed), 1)` secs). 
+
+Next, we examine a latent space from one of the replicates:
+
+```{r STNNGP_res_w, echo = FALSE, fig.width = 9, fig.height = 4.5}
+data.frame(long = rep(coords[,1], times = 2), 
+           lat = rep(coords[,2], times = 2),
+           w = c(what, data$W), 
+           type = rep(c("Estimate", "Truth"), each = n*q), 
+           var = rep(paste0("w[", 1:q, "]"), each = n)) %>% 
+  ggplot() + 
+  geom_raster(aes(long, lat, fill = w)) + 
+  facet_grid(type~var, labeller = label_parsed) +
+  labs(x = "", y = "", fill = "") + 
+  scale_fill_distiller(palette = "Spectral") +
+  theme(legend.position = "bottom")
+```
+
+We also run a nonseparable STNNGP simulation.
 
 ```{r rstnngp_ns}
-# set seed 
-seed <- 20240720
+# set seed
+seed <- 20241107
 set.seed(seed)
 
-# create coordinates on a grid 
-coords <- expand.grid(seq(0, 1, length = 20), 
-                      seq(0, 1, length = 20)) %>% 
-  arrange(Var1) %>%                                                             
-  as.matrix() 
+# create coordinates on a grid
+coords <- expand.grid(seq(0, 1, length = 30),
+                      seq(0, 1, length = 30)) %>%
+  arrange(Var1) %>%
+  as.matrix()
+n <- nrow(coords)
 
-# parameters 
+# parameters
 ## number of neighbors
 m <- 15
 
 ## spanning tree
-q <- 5
+q <- 6
 A <- matrix(0, q, q)
 for (j in 2:q) {
   A[j-1,j] <- 1
@@ -242,36 +312,41 @@ T0 <- graph_from_adjacency_matrix(A, "undirected")
 plot(T0, layout = layout_as_tree(T0, root = 1), main = "Spanning Tree")
 
 ## covariance
-tau.sq <- seq(0.1, 0.5, length = q)
+tau.sq <- seq(0.01, 0.05, length = q)
 rho <- runif(q-1, -1, 1)
-phi <- seq(3/0.2, 3/0.8, length = q)                                            
-sigma.sq <- seq(1, 3, length = q)
+phi <- seq(3/0.2, 3/0.8, length = q)
+sigma.sq <- seq(0.8, 1.5, length = q)
 cross.phi <- rep(0, q-1)
 for (me in 2:q) {
   parent <- which(A[,me] == 1)
   cross.phi[me-1] <- sqrt(0.5*(phi[parent]^2+phi[me]^2))
 }
-  
+
 ## coefficients for covariates
-p <- 1
+p <- 2
 beta <- matrix(rnorm(p*q, sd = 3), p, q)
 
 # fitting parameters
+verbose <- FALSE
 n.threads <- 15
 burn <- 1000
 thin <- 2
 save <- 1000
 n.samples <- burn + thin*save
-starting <- list("beta" = beta, "phi" = phi, "sigma.sq" = sigma.sq, 
-                 "tau.sq" = tau.sq, "adjmat" = A, "cross.phi" = cross.phi, 
-                 "rho" = rho)
-tuning <- list("phi" = rep(0.1, q),
-               "sigma.sq" = rep(0.03, q), 
-               "tau.sq" = rep(0.01, q), 
-               "cross.phi" = rep(0.5, q-1), 
-               "rho" = abs(rho)/10)                                             # for ~40% acceptance rate
-priors <- list("phi.Unif" = cbind(rep(3/1, q), rep(3/0.1, q)), 
-               "sigma.sq.IG" = cbind(2, sigma.sq), 
+starting_latent <- list("beta" = beta, "phi" = phi, "sigma.sq" = sigma.sq,
+                        "tau.sq" = tau.sq, "adjmat" = A, "cross.phi" = cross.phi,
+                        "rho" = rho)
+tuning <- list("phi" = rep(0.05, q),
+               "sigma.sq" = rep(0.01, q),
+               "cross.phi" = rep(0.05, q-1),
+               "rho" = rep(0.05, q-1),
+               "tau.sq" = tau.sq/10)
+tuning_latent <- list("phi" = rep(0.01, q),
+                      "sigma.sq" = rep(0.02, q),
+                      "cross.phi" = rep(0.01, q-1),
+                      "rho" = rep(0.01, q-1))                                   # for ~35% acceptance rate
+priors <- list("phi.Unif" = cbind(rep(3/1, q), rep(3/0.1, q)),
+               "sigma.sq.IG" = cbind(2, sigma.sq),
                "tau.sq.IG" = cbind(2, tau.sq))
 cov.model <- "exponential"
 ```
@@ -279,44 +354,54 @@ cov.model <- "exponential"
 ```{r STNNGP_NS, cache = TRUE}
 set.seed(seed)
 
-# number of replicates 
-reps <- 15
+# number of replicates
+reps <- 5
 
-# set seeds for replicates 
+# set seeds for replicates
 seeds <- sample(100, reps)
 
-# save results 
-betas <- matrix(0, reps, p*q)
-tau.sqs <- matrix(0, reps, q)
-sigma.sqs <- matrix(0, reps, q)
-phis <- matrix(0, reps, q)
-ssqphis <- matrix(0, reps, q)
-cross.phis <- matrix(0, reps, q-1)
-rhos <- matrix(0, reps, q-1)
-telapsed <- rep(0, reps)
+# save results
+betas <- matrix(0, reps, (p+1)*q)
+betas_latent <- matrix(0, reps, p*q)
+tau.sqs = tau.sqs_latent <- matrix(0, reps, q)
+sigma.sqs = sigma.sqs_latent <- matrix(0, reps, q)
+phis = phis_latent <- matrix(0, reps, q)
+ssqphis = ssqphis_latent <- matrix(0, reps, q)
+cross.phis = cross.phis_latent <- matrix(0, reps, q-1)
+rhos = rhos_latent <- matrix(0, reps, q-1)
+mses_latent <- rep(0, reps)
+telapsed_ns = telapsed_ns_latent <- rep(0, reps)
 
 for (i in 1:reps) {
   seed <- seeds[i]
-  data <- rstnngp_ns(coords, 
-                     params = list(tau.sq = tau.sq,
-                                   sigma.sq = sigma.sq,
-                                   phi = phi, 
-                                   cross.phi = cross.phi, 
-                                   rho = rho,
-                                   beta = beta, 
-                                   adjmat = A, 
-                                   n.neighbors = m), 
-                     seed = seed)
+  data <- rstnngp(coords,
+                  mv.model = "nonseparable",
+                  params = list(tau.sq = tau.sq,
+                                sigma.sq = sigma.sq,
+                                phi = phi,
+                                cross.phi = cross.phi,
+                                rho = rho,
+                                beta = beta,
+                                adjmat = A,
+                                n.neighbors = m),
+                  seed = seed)
+  beta0 <- data$W %>% colMeans()
+  starting <- list("beta" = rbind(beta0, beta), "phi" = phi, "sigma.sq" = sigma.sq,
+                   "tau.sq" = tau.sq, "adjmat" = A, "cross.phi" = cross.phi,
+                   "rho" = rho)
 
-  out <- STNNGP_NS(data$Y ~ data$X-1,
-                   coords = coords, method = "response",
-                   n.neighbors = m,
-                   starting = starting, tuning = tuning, priors = priors,
-                   cov.model = cov.model,
-                   n.samples = n.samples,
-                   n.omp.threads = n.threads,
-                   verbose = FALSE)
-                
+  out <- STNNGP(Y ~ X,
+                data = data,
+                coords = coords,
+                mv.model = "nonseparable",
+                method = "response",
+                n.neighbors = m,
+                starting = starting, tuning = tuning, priors = priors,
+                cov.model = cov.model,
+                n.samples = n.samples,
+                n.omp.threads = n.threads,
+                verbose = verbose)
+
   betas[i,] <- out$p.beta.samples[burn+thin*1:save,] %>% colMeans()
   tau.sqs[i,] <- out$p.tausq.samples[burn+thin*1:save,] %>% colMeans()
   sigma.sqs[i,] <- out$p.sigmasq.samples[burn+thin*1:save,] %>% colMeans()
@@ -325,36 +410,93 @@ for (i in 1:reps) {
                    out$p.phi.samples[burn+thin*1:save,]) %>% colMeans()
   cross.phis[i,] <- out$p.crossphi.samples[burn+thin*1:save,] %>% colMeans()
   rhos[i,] <- out$p.rho.samples[burn+thin*1:save,] %>% colMeans()
-  telapsed[i] <- out$run.time[3]
+  telapsed_ns[i] <- out$run.time[3]
+
+  out_latent <- STNNGP(Y ~ X-1,
+                       data = data,
+                       coords = coords,
+                       mv.model = "nonseparable",
+                       method = "latent",
+                       n.neighbors = m,
+                       starting = starting_latent,
+                       tuning = tuning_latent,
+                       priors = priors,
+                       cov.model = cov.model,
+                       n.samples = n.samples,
+                       n.omp.threads = n.threads,
+                       verbose = verbose)
+
+  betas_latent[i,] <- out_latent$p.beta.samples[burn+thin*1:save,] %>% colMeans()
+  tau.sqs_latent[i,] <- out_latent$p.tausq.samples[burn+thin*1:save,] %>% colMeans()
+  sigma.sqs_latent[i,] <- out_latent$p.sigmasq.samples[burn+thin*1:save,] %>% colMeans()
+  phis_latent[i,] <- out_latent$p.phi.samples[burn+thin*1:save,] %>% colMeans()
+  ssqphis_latent[i,] <- (out_latent$p.sigmasq.samples[burn+thin*1:save,]*
+                           out_latent$p.phi.samples[burn+thin*1:save,]) %>% colMeans()
+  cross.phis_latent[i,] <- out_latent$p.crossphi.samples[burn+thin*1:save,] %>% colMeans()
+  rhos_latent[i,] <- out_latent$p.rho.samples[burn+thin*1:save,] %>% colMeans()
+  what <- out_latent$p.w.samples[,burn+thin*1:save] %>% rowMeans() %>% matrix(., n, q)
+  mses_latent[i] <- mean(c(data$W - what)^2)
+  telapsed_ns_latent[i] <- out_latent$run.time[3]
 }
 ```
 
-```{r STNNGP_NSres, echo = FALSE, out.width = "100%", fig.height = 6.5}
-params_est <- cbind(betas, tau.sqs, sigma.sqs, phis, ssqphis, cross.phis, rhos, telapsed) %>% 
+```{r STNNGP_NSres, echo = FALSE, fig.width = 9, fig.height = 12}
+params_est <- cbind(matrix(betas[,-c(1+(p+1)*0:(q-1))], ncol = p*q), tau.sqs,
+                    sigma.sqs, phis, ssqphis, cross.phis, rhos, telapsed_ns) %>%
   as.data.frame()
-params_true <- c(c(beta), tau.sq, sigma.sq, phi, sigma.sq*phi, cross.phi, rho) %>% 
-  matrix(., nrow = 1) %>% 
+params_est_latent <- cbind(betas_latent, tau.sqs_latent, sigma.sqs_latent,
+                           phis_latent, ssqphis_latent, cross.phis_latent,
+                           rhos_latent, mses_latent, telapsed_ns_latent) %>%
   as.data.frame()
-col_labels <- c(paste0("beta[",1:(p*q),"]"), 
-                paste0("tau[",1:q,"]^2"), 
-                paste0("sigma[",1:q,"]^2"), 
-                paste0("phi[",1:q,"]"), 
-                paste0("(sigma^2*phi)[",1:q,"]^2"), 
+params_true <- c(c(beta), tau.sq, sigma.sq, phi, sigma.sq*phi, cross.phi, rho) %>%
+  matrix(., nrow = 1) %>%
+  as.data.frame()
+col_labels <- c(paste0("beta[",1:(p*q),"]"),
+                paste0("tau[",1:q,"]^2"),
+                paste0("sigma[",1:q,"]^2"),
+                paste0("phi[",1:q,"]"),
+                paste0("(sigma^2*phi)[",1:q,"]^2"),
                 paste0("phi[",apply(A[,2:q], 2, function(x) which(x==1)),2:q,"]"),
-                paste0("rho[",apply(A[,2:q], 2, function(x) which(x==1)),2:q,"]"),
-                "time (secs)")
-colnames(params_est) <- col_labels
-colnames(params_true) <- col_labels[-length(col_labels)]
-params_est_long <- params_est %>% pivot_longer(everything(), names_to = "var") 
-params_true_long <- params_true %>% pivot_longer(everything(), names_to = "var") 
+                paste0("rho[",apply(A[,2:q], 2, function(x) which(x==1)),2:q,"]"))
+
+colnames(params_est) <- c(col_labels, "time (secs)")
+colnames(params_est_latent) <- c(col_labels, "mse", "time (secs)")
+colnames(params_true) <- col_labels
+params_est_long <- params_est %>%
+  pivot_longer(everything(), names_to = "var") %>%
+  mutate(method = "response")
+params_est_long_latent <- params_est_latent %>%
+  pivot_longer(everything(), names_to = "var") %>%
+  mutate(method = "latent")
+params_true_long <- params_true %>% pivot_longer(everything(), names_to = "var")
 params_est_long %>%
-  ggplot(aes(y = value)) + 
-  facet_wrap(~factor(var, levels = col_labels), 
+  bind_rows(params_est_long_latent) %>%
+  ggplot(aes(y = value, x = method)) +
+  facet_wrap(~factor(var, levels = c(col_labels, "mse", "time (secs)")),
              labeller = label_parsed, scales = "free") +
   geom_boxplot(fill = "gray90") +
-  geom_hline(data = params_true_long, aes(yintercept = value), color = "red", linetype = "dashed") + 
+  geom_hline(data = params_true_long, aes(yintercept = value),
+             color = "red", linetype = "dashed") +
   labs(y = "", x = "", title = "Parameter estimates over replicates") +
-  theme(axis.title.x = element_blank(),
-        axis.text.x = element_blank(),
-        axis.ticks.x = element_blank())
+  scale_x_discrete(guide = guide_axis(angle = 30))
 ```
+
+In this nonseparable scenario, similarly to the separable scenario, $\tau^2_j$'s are more accurately estimated with less standard errors in the response model than in the latent model. On the other hand, estimation of $\phi_{jk}$ via Metropolis is more accurate in the latent model than in the response model. In this nonseparable scenario, the latent model ($\sim$ `r round(mean(telapsed_ns_latent), 1)` secs) takes `r round(mean(telapsed_ns_latent)/mean(telapsed_ns), 1)` times longer than the response model ($\sim$ `r round(mean(telapsed_ns), 1)` secs). 
+
+```{r STNNGP_NSres_w, echo = FALSE, fig.width = 9, fig.height = 4.5}
+data.frame(long = rep(coords[,1], times = 2),
+           lat = rep(coords[,2], times = 2),
+           w = c(what, data$W),
+           type = rep(c("Estimate", "Truth"), each = n*q),
+           var = rep(paste0("w[", 1:q, "]"), each = n)) %>%
+  ggplot() +
+  geom_raster(aes(long, lat, fill = w)) +
+  facet_grid(type~var, labeller = label_parsed) +
+  labs(x = "", y = "", fill = "") +
+  scale_fill_distiller(palette = "Spectral") +
+  theme(legend.position = "bottom")
+```
+
+From the separable scenario to the nonseparable scenario, `r 3*(q-1)` more parameters were introduced, which is a `r round(3*(q-1)/(2+q+(q-1)+q*p)*100, 1)`% increase in the number of parameters from the separable model. Nonseparability led to `r round(mean((telapsed_ns - telapsed)/telapsed*100), 1)`% and `r round(mean((telapsed_ns_latent - telapsed_latent)/telapsed_latent*100), 1)`% increase in computing time of the response model and latent model, respectively.
+
+

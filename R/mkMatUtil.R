@@ -27,4 +27,3 @@ parseFormula <-  function(formula, data, intercept=TRUE, justX=FALSE){
     return(list(Y, X, xvars, xobs))
   }
 
-

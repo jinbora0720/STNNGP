@@ -29,7 +29,6 @@ SEXP mkUIndx(SEXP n_r, SEXP m_r, SEXP nnIndx_r, SEXP uIndx_r, SEXP uIndxLU_r, SE
   int *nnIndxLU = INTEGER(nnIndxLU_r);
   int searchType = INTEGER(searchType_r)[0];
   int i, j, k;
-  int nIndx = static_cast<int>(static_cast<double>(1+m)/2*m+(n-m-1)*m);
 
   if(searchType == 0){
     mkUIndx0(n, m, nnIndx, uIndx, uIndxLU);
@@ -50,7 +49,6 @@ SEXP mkUIndx(SEXP n_r, SEXP m_r, SEXP nnIndx_r, SEXP uIndx_r, SEXP uIndxLU_r, SE
   
   return R_NilValue;
 }
-
 
 ///////////////////////////////////////////////////////////////////
 //Brute force 
@@ -251,4 +249,34 @@ extern "C" {
     
     return R_NilValue;
   }
+}
+
+///////////////////////////////////////////////////////////////////
+// BJ: u index (among undirected neighbors)
+///////////////////////////////////////////////////////////////////
+
+SEXP mkuUIndx(SEXP n_r, SEXP m_r, SEXP nnIndxParent_r, SEXP uuIndx_r, SEXP uuIndxLU_r, SEXP uuiIndx_r, SEXP nnIndxLUParent_r){
+  
+  int n = INTEGER(n_r)[0];
+  int m = INTEGER(m_r)[0];
+  int mp1 = m+1;
+  int *nnIndxParent = INTEGER(nnIndxParent_r);
+  int *uuIndx = INTEGER(uuIndx_r);
+  int *uuIndxLU = INTEGER(uuIndxLU_r);
+  int *uuiIndx = INTEGER(uuiIndx_r);
+  int *nnIndxLUParent = INTEGER(nnIndxLUParent_r);
+  int i, j, k;
+  
+  mkuUIndx2(n, m, nnIndxParent, nnIndxLUParent, uuIndx, uuIndxLU);
+  
+  //u lists those locations that have the i-th location as a neighbor
+  //then for each of those locations that have i as a neighbor, we need to know the index of i in each of their B vectors (i.e. where does i fall in their neighbor set)
+  for(i = 0; i < n; i++){//for each i
+    for(j = 0; j < uuIndxLU[n+i]; j++){//for each location that has i as a neighbor
+      k = uuIndx[uuIndxLU[i]+j];//index of a location that has i as a neighbor
+      uuiIndx[uuIndxLU[i]+j] = which(i, &nnIndxParent[nnIndxLUParent[k]], mp1);
+    }
+  }
+  
+  return R_NilValue;
 }
