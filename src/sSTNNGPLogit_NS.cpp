@@ -34,12 +34,12 @@ extern "C" {
                        SEXP sigmaSqIGa_r, SEXP sigmaSqIGb_r,                    // BJ
                        SEXP phiUnifa_r, SEXP phiUnifb_r,                        // BJ
                        SEXP nuUnifa_r, SEXP nuUnifb_r,                          // BJ
-                       SEXP wStarting_r,                                        // BJ: debug
                        SEXP betaStarting_r, SEXP sigmaSqStarting_r, 
                        SEXP phiStarting_r, 
                        SEXP crossphiStarting_r,                                 // BJ
                        SEXP nuStarting_r, 
                        SEXP rhoStarting_r, SEXP adjmatStarting_r,               // BJ
+                       SEXP wStarting_r,                                        // BJ
                        SEXP sigmaSqTuning_r,                                    // BJ
                        SEXP phiTuning_r, 
                        SEXP crossphiTuning_r,                                   // BJ
@@ -47,7 +47,6 @@ extern "C" {
                        SEXP rhoTuning_r,                                        // BJ
                        SEXP nSamples_r, SEXP nThreads_r, SEXP verbose_r, SEXP nReport_r){ 
                           
-    
     int h, i, j, j2, k, k2, l, o, s, info, nProtect=0;
     const int inc = 1;
     const double one = 1.0;
@@ -152,6 +151,7 @@ extern "C" {
     double *nu = (double *) R_alloc(q, sizeof(double));                         // BJ
     double *rho = (double *) R_alloc(qm1, sizeof(double));                      // BJ
     int *adjvec = INTEGER(adjmatStarting_r);                                    // BJ
+    double *w = (double *) R_alloc(nq, sizeof(double));                         // BJ
     
     F77_NAME(dcopy)(&pq, REAL(betaStarting_r), &inc, beta, &inc);               // BJ
     F77_NAME(dcopy)(&q, REAL(sigmaSqStarting_r), &inc, sigmaSq, &inc);          // BJ
@@ -165,6 +165,7 @@ extern "C" {
       for(int o = 0; o < q; o++) { nu[o] = 0.5; }                               // BJ: for rholim
     } else { zeros(nu, q); }                                                    // BJ
     F77_NAME(dcopy)(&qm1, REAL(rhoStarting_r), &inc, rho, &inc);                // BJ
+    F77_NAME(dcopy)(&nq, REAL(wStarting_r), &inc, w, &inc);                     // BJ
     
     // BJ: for PG augmentation
     double *omega = (double *) R_alloc(nq, sizeof(double)); zeros(omega, nq);   
@@ -227,8 +228,6 @@ extern "C" {
     double *tmp_n_parent = (double *) R_alloc(n, sizeof(double));               // BJ
     double *tmp_zero = (double *) R_alloc(n, sizeof(double));                   // BJ
     zeros(tmp_zero, n);                                                         // BJ
-    double *w = (double *) R_alloc(nq, sizeof(double)); zeros(w, nq);           // BJ
-    F77_NAME(dcopy)(&nq, REAL(wStarting_r), &inc, w, &inc);                     // BJ: debug
     double a, v, b, e, mu, var, aij;
     double ac, a_ss, a_th, vc;                                                  // BJ
 
@@ -252,6 +251,14 @@ extern "C" {
                        sigmaSq, phi, nu,
                        rho, crossphi, adjvec,
                        covModel, nThreads, nuUnifb);
+    
+    for (MeIndx = 0; MeIndx < q; MeIndx++) {
+      for (i = 0; i < n; i++) {
+        if (missing[n*MeIndx+i] != 1.0) {
+          kappa[n*MeIndx+i] = y[n*MeIndx+i] - static_cast<double>(nTrial[n*MeIndx+i])/2.0;
+        }
+      }
+    }
     
     for(s = 0; s < nSamples; s++){
       ParentIndx = 0;                                                           // BJ: for MeIndx = 0, does not affect results

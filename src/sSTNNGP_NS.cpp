@@ -340,7 +340,7 @@ extern "C" {
     F77_NAME(dgemm)(ytran, ntran, &p, &p, &n, &one, X, &n, X, &n, &zero, XtX, &p FCONE FCONE);
     double *w = (double *) R_alloc(nq, sizeof(double)); zeros(w, nq);           // BJ
     double a, v, b, e, mu, var, aij;
-    double ac, a_ss, a_th, vc;                                                  // BJ
+    double ac, a_th, vc;                                                        // BJ
 
     int MeIndx, ParentIndx, ChildIndx;                                          // BJ
 

@@ -362,7 +362,6 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response",
   cross.phi.starting <- rep(0, q-1)                                             # BJ
   nu.starting <- rep(0, q)                                                      # BJ
   rho.starting <- 0                                                             # BJ
-  w.starting <- c(starting$w)                                                   # BJ: debug
   
   if(missing(starting)){stop("error: starting value list for the parameters must be specified")}
   
@@ -448,7 +447,12 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response",
     storage.mode(cross.phi.starting) <- "double"                                # BJ
   }
   
-  storage.mode(w.starting) <- "double"                                          # BJ: debug
+  if (is.null(starting$w)) {
+    w.starting <- rep(0, n*q)
+  } else {
+    w.starting <- c(starting$w)
+  }
+  
   storage.mode(beta.starting) <- "double"
   storage.mode(sigma.sq.starting) <- "double"
   storage.mode(tau.sq.starting) <- "double"
@@ -456,7 +460,8 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response",
   storage.mode(nu.starting) <- "double"
   storage.mode(rho.starting) <- "double"                                        # BJ
   storage.mode(adjmat.starting) <- "integer"                                    # BJ
-  
+  storage.mode(w.starting) <- "double"                                          # BJ
+   
   ####################################################
   ##Tuning values
   ####################################################
@@ -683,7 +688,7 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response",
     }else{##sequential
       if (mv.model == "separable") {
         if (misalign) {
-          out <- .Call("sSTNNGP_misalign", Y, X, 
+          out <- .Call("sSTNNGP_misalign", Y, X,
                        XtX,                                                     # BJ
                        q, p, n, n.neighbors, coords,
                        nj, Y_missing,                                           # BJ
@@ -700,6 +705,7 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response",
                        phi.starting, nu.starting,
                        rho.starting,
                        adjmat.starting,
+                       w.starting,
                        phi.tuning, nu.tuning,
                        rho.tuning,
                        n.samples, n.omp.threads, verbose, n.report)
@@ -791,9 +797,9 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response",
                    uu.indx, uu.indx.lu, uui.indx,                               # BJ: for case 3
                    c.indx, c.indx.lu,   
                    sigma.sq.IG, phi.Unif, nu.Unif, rho.Unif,
-                   w.starting,                                                  # BJ: debug
                    beta.starting, sigma.sq.starting, phi.starting, nu.starting,
                    rho.starting, adjmat.starting,
+                   w.starting, 
                    phi.tuning, nu.tuning, rho.tuning,
                    n.samples, n.omp.threads, verbose, n.report, 
                    update.sigma.sq, update.beta, update.w)
@@ -816,13 +822,13 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response",
                    sigma.sq.IGa, sigma.sq.IGb,                                  # BJ: added compared to sSTNNGP
                    phi.Unifa, phi.Unifb,                                        # BJ: added compared to sSTNNGP
                    nu.Unifa, nu.Unifb,                                          # BJ: added compared to sSTNNGP
-                   w.starting,                                                  # BJ: debug
                    beta.starting, sigma.sq.starting, 
                    phi.starting,
                    cross.phi.starting,                                          # BJ: added compared to sSTNNGP
                    nu.starting,
                    rho.starting,
                    adjmat.starting,
+                   w.starting, 
                    sigma.sq.tuning,
                    phi.tuning,
                    cross.phi.tuning,                                            # BJ: added compared to sSTNNGP
@@ -837,7 +843,7 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response",
   out$p.beta.samples <- mcmc(t(out$p.beta.samples))
   if (family == "gaussian") {
     out$p.tausq.samples <- mcmc(t(out$p.tausq.samples))
-  } 
+  }
   out$p.rho.samples <- mcmc(t(out$p.rho.samples))
   if (mv.model == "separable") {                                                # BJ
     out$p.theta.samples <- mcmc(t(out$p.theta.samples))
@@ -900,18 +906,18 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response",
 
   if(method == "latent"){
     out$p.w.samples <- out$p.w.samples[rep(0:(q-1)*n, each = n)+order(ord),,drop=FALSE] # BJ
-    if (misalign) {                                                             # BJ: posterior predictive sample
-      if (family == "gaussian") {
-        p.ypred.samples <- (diag(q)%x%out$X)%*%t(out$p.beta.samples) + 
-          out$p.w.samples + 
-          bind_rows(replicate(n, data.frame(sqrt(t(out$p.tausq.samples))), simplify = FALSE))*
-          matrix(rnorm(n*q), nrow = n*q, ncol = n.samples)                      
-        out$p.ypred.samples <- as.matrix(p.ypred.samples)
-      } else {
-        p.psi.samples <- (diag(q)%x%out$X)%*%t(out$p.beta.samples) + out$p.w.samples
-        out$p.ypred.samples <- 1/(1+exp(-p.psi.samples))
-      }
-    }
+    # if (misalign) {                                                             # BJ: posterior predictive sample
+    #   if (family == "gaussian") {
+    #     p.ypred.samples <- (diag(q)%x%out$X)%*%t(out$p.beta.samples) +
+    #       out$p.w.samples +
+    #       bind_rows(replicate(n, data.frame(sqrt(t(out$p.tausq.samples))), simplify = FALSE))*
+    #       matrix(rnorm(n*q), nrow = n*q, ncol = n.samples)
+    #     out$p.ypred.samples <- as.matrix(p.ypred.samples)
+    #   } else {
+    #     p.psi.samples <- (diag(q)%x%out$X)%*%t(out$p.beta.samples) + out$p.w.samples
+    #     out$p.ypred.samples <- 1/(1+exp(-p.psi.samples))
+    #   }
+    # }
   }
 
   out$n.neighbors <- n.neighbors

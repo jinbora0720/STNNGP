@@ -34,10 +34,10 @@ extern "C" {
                     SEXP sigmaSqIG_r, 
                     SEXP phiUnif_r, SEXP nuUnif_r, 
                     SEXP rhoUnif_r,                                             // BJ
-                    SEXP wStarting_r,                                           // BJ: debug
                     SEXP betaStarting_r, SEXP sigmaSqStarting_r, 
                     SEXP phiStarting_r, SEXP nuStarting_r, 
                     SEXP rhoStarting_r, SEXP adjmatStarting_r,                  // BJ
+                    SEXP wStarting_r,                                           // BJ
                     SEXP phiTuning_r, SEXP nuTuning_r, 
                     SEXP rhoTuning_r,                                           // BJ
                     SEXP nSamples_r, SEXP nThreads_r, SEXP verbose_r, SEXP nReport_r, 
@@ -150,6 +150,7 @@ extern "C" {
     double *theta = (double *) R_alloc(nTheta, sizeof(double));
     double *rho = (double *) R_alloc(qm1, sizeof(double));                      // BJ
     int *adjvec = INTEGER(adjmatStarting_r);                                    // BJ
+    double *w = (double *) R_alloc(nq, sizeof(double));                         // BJ
     
     F77_NAME(dcopy)(&pq, REAL(betaStarting_r), &inc, beta, &inc);               // BJ
     theta[sigmaSqIndx] = REAL(sigmaSqStarting_r)[0];
@@ -158,6 +159,7 @@ extern "C" {
       theta[nuIndx] = REAL(nuStarting_r)[0];
     }
     F77_NAME(dcopy)(&qm1, REAL(rhoStarting_r), &inc, rho, &inc);                // BJ
+    F77_NAME(dcopy)(&nq, REAL(wStarting_r), &inc, w, &inc);                     // BJ
     
     // BJ: for PG augmentation
     double *omega = (double *) R_alloc(nq, sizeof(double)); // zeros(omega, nq);   
@@ -205,8 +207,6 @@ extern "C" {
     double *bk = (double *) R_alloc(nThreads*(1.0+static_cast<int>(floor(nuUnifb))), sizeof(double));
     double *tmp_zero = (double *) R_alloc(n, sizeof(double));                   // BJ
     zeros(tmp_zero, n);                                                         // BJ
-    double *w = (double *) R_alloc(nq, sizeof(double)); zeros(w, nq);           
-    F77_NAME(dcopy)(&nq, REAL(wStarting_r), &inc, w, &inc);                     // BJ: debug
     double a, v, b, e, mu, var, aij, phiCand, nuCand = 0, nu = 0; 
     if (corName == "matern") { nu = theta[nuIndx]; }
     double ac, a_ss, a_th, vc;                                                  // BJ
