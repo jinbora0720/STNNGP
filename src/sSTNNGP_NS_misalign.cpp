@@ -39,12 +39,14 @@ extern "C" {
                            SEXP crossphiStarting_r,                             // BJ
                            SEXP nuStarting_r, 
                            SEXP rhoStarting_r, SEXP adjmatStarting_r,           // BJ
+                           SEXP wStarting_r,                                    // BJ
                            SEXP sigmaSqTuning_r,                                // BJ
                            SEXP phiTuning_r, 
                            SEXP crossphiTuning_r,                               // BJ
                            SEXP nuTuning_r, 
                            SEXP rhoTuning_r,                                    // BJ
-                           SEXP nSamples_r, SEXP nThreads_r, SEXP verbose_r, SEXP nReport_r){ 
+                           SEXP nSamples_r, SEXP nThreads_r, SEXP verbose_r, SEXP nReport_r, 
+                           SEXP savew_r){                                       // BJ
 
     int h, i, j, j2, k, k2, l, o, s, info, nProtect=0;
     const int inc = 1;
@@ -93,10 +95,12 @@ extern "C" {
     double *tauSqIGb = REAL(tauSqIGb_r);                                        // BJ 
     double crossphiUnifa, crossphiUnifb, rhoUnifa = -1, rhoUnifb = 1;           // BJ
     
+    //for iterations
     int nSamples = INTEGER(nSamples_r)[0];
     int nThreads = INTEGER(nThreads_r)[0];
     int verbose = INTEGER(verbose_r)[0];
     int nReport = INTEGER(nReport_r)[0];
+    int savew = INTEGER(savew_r)[0];
     
 #ifdef _OPENMP
     omp_set_num_threads(nThreads);
@@ -155,6 +159,7 @@ extern "C" {
     double *tauSq = (double *) R_alloc(q, sizeof(double));                      // BJ
     double *rho = (double *) R_alloc(qm1, sizeof(double));                      // BJ
     int *adjvec = INTEGER(adjmatStarting_r);                                    // BJ
+    double *w = (double *) R_alloc(nq, sizeof(double));                         // BJ
     
     F77_NAME(dcopy)(&pq, REAL(betaStarting_r), &inc, beta, &inc);               // BJ
     F77_NAME(dcopy)(&q, REAL(sigmaSqStarting_r), &inc, sigmaSq, &inc);          // BJ
@@ -169,6 +174,7 @@ extern "C" {
     } else { zeros(nu, q); }                                                    // BJ
     F77_NAME(dcopy)(&q, REAL(tauSqStarting_r), &inc, tauSq, &inc);              // BJ
     F77_NAME(dcopy)(&qm1, REAL(rhoStarting_r), &inc, rho, &inc);                // BJ
+    F77_NAME(dcopy)(&nq, REAL(wStarting_r), &inc, w, &inc);                     // BJ
     
     //tuning and fixed
     double *sigmaSqTuning = REAL(sigmaSqTuning_r);                              // BJ
@@ -183,7 +189,9 @@ extern "C" {
     //return stuff  
     SEXP wSamples_r, betaSamples_r, sigmaSqSamples_r, phiSamples_r,             // BJ
     crossphiSamples_r, tauSqSamples_r, rhoSamples_r, nuSamples_r;               // BJ
-    PROTECT(wSamples_r = allocMatrix(REALSXP, nq, nSamples)); nProtect++;       // BJ
+    if (savew) {
+      PROTECT(wSamples_r = allocMatrix(REALSXP, nq, nSamples)); nProtect++;     // BJ
+    }
     PROTECT(betaSamples_r = allocMatrix(REALSXP, pq, nSamples)); nProtect++;    // BJ
     PROTECT(sigmaSqSamples_r = allocMatrix(REALSXP, q, nSamples)); nProtect++;  // BJ
     PROTECT(phiSamples_r = allocMatrix(REALSXP, q, nSamples)); nProtect++;      // BJ
@@ -226,7 +234,6 @@ extern "C" {
     double *tmp_n_parent = (double *) R_alloc(n, sizeof(double));               // BJ
     double *tmp_zero = (double *) R_alloc(n, sizeof(double));                   // BJ
     zeros(tmp_zero, n);                                                         // BJ
-    double *w = (double *) R_alloc(nq, sizeof(double)); zeros(w, nq);           // BJ
     double a, v, b, e, mu, var, aij;
     double ac, a_ss, a_th, vc;                                                  // BJ
 
@@ -661,7 +668,9 @@ extern "C" {
       }                                                                         // BJ
       F77_NAME(dcopy)(&qm1, rho, &inc, &REAL(rhoSamples_r)[s*qm1], &inc);       // BJ
       F77_NAME(dcopy)(&q, tauSq, &inc, &REAL(tauSqSamples_r)[s*q], &inc);       // BJ
-      F77_NAME(dcopy)(&nq, w, &inc, &REAL(wSamples_r)[s*nq], &inc);             // BJ
+      if (savew) {
+        F77_NAME(dcopy)(&nq, w, &inc, &REAL(wSamples_r)[s*nq], &inc);           // BJ
+      }
 
       //report
       if(status == nReport){
@@ -697,7 +706,8 @@ extern "C" {
     
     //make return object
     SEXP result_r, resultName_r;
-    int nResultListObjs = 7;
+    int nResultListObjs = 6;
+    if (savew) { nResultListObjs += 1; }
     if (corName == "matern") { nResultListObjs += 1;}
     
     PROTECT(result_r = allocVector(VECSXP, nResultListObjs)); nProtect++;
@@ -721,12 +731,14 @@ extern "C" {
     SET_VECTOR_ELT(result_r, 5, rhoSamples_r);
     SET_VECTOR_ELT(resultName_r, 5, mkChar("p.rho.samples"));
     
-    SET_VECTOR_ELT(result_r, 6, wSamples_r);
-    SET_VECTOR_ELT(resultName_r, 6, mkChar("p.w.samples"));
+    if (savew) {
+      SET_VECTOR_ELT(result_r, 6, wSamples_r);
+      SET_VECTOR_ELT(resultName_r, 6, mkChar("p.w.samples"));
+    }
     
     if (corName == "matern") {
-      SET_VECTOR_ELT(result_r, 7, nuSamples_r);
-      SET_VECTOR_ELT(resultName_r, 7, mkChar("p.nu.samples"));
+      SET_VECTOR_ELT(result_r, nResultListObjs-1, nuSamples_r);
+      SET_VECTOR_ELT(resultName_r, nResultListObjs-1, mkChar("p.nu.samples"));
     }
     namesgets(result_r, resultName_r);
     

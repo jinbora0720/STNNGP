@@ -24,7 +24,7 @@ extern "C" {
                       SEXP betaSamples_r, SEXP tauSqSamples_r, SEXP rhoSamples_r, 
                       SEXP thetaSamples_r, SEXP wSamples_r, 
                       SEXP nSamples_r, SEXP family_r, SEXP covModel_r, SEXP nThreads_r, 
-                      SEXP verbose_r, SEXP nReport_r){
+                      SEXP verbose_r, SEXP nReport_r, SEXP eps_r){
 
     int h, i, j, k, k2, l, l2, s, info, nProtect=0, MeIndx, ParentIndx;
     const int inc = 1;
@@ -67,6 +67,7 @@ extern "C" {
     int nThreads = INTEGER(nThreads_r)[0];
     int verbose = INTEGER(verbose_r)[0];
     int nReport = INTEGER(nReport_r)[0];
+    double eps = REAL(eps_r)[0];                                                // BJ 
     
 #ifdef _OPENMP
     omp_set_num_threads(nThreads);
@@ -125,7 +126,8 @@ extern "C" {
     double *C = (double *) R_alloc(nThreads*twomsq, sizeof(double)); zeros(C, nThreads*twomsq);
     double *c = (double *) R_alloc(nThreads*twom, sizeof(double)); zeros(c, nThreads*twom);
     double *tmp_B  = (double *) R_alloc(nThreads*twom, sizeof(double));         // BJ
-    double phi, nu, sigmaSq, d; 
+    zeros(tmp_B, nThreads*twom);                                                // BJ
+    double phi, nu = 0, sigmaSq, d; 
     double tauSqj, rhoj;                                                        // BJ
     int threadID = 0, status = 0;
     double psi;                                                                 // BJ
@@ -189,6 +191,8 @@ extern "C" {
             }
             sigmaSq = theta[s*nTheta+sigmaSqIndx];
             tauSqj = tauSq[s*q+MeIndx];                                         // BJ
+            // // BJ: check
+            // Rprintf("phi=%f, sigmaSq=%f, tauSq=%f\n", phi, sigmaSq, tauSqj);
 
             for(k = 0; k < m; k++){
               d = dist2(coords[nnIndx0[i+n0*k]], coords[n+nnIndx0[i+n0*k]], coords0[i], coords0[n0+i]);
@@ -208,6 +212,8 @@ extern "C" {
             for(k = 0; k < m; k++){
               d += tmp_B[threadID*twom+k]*w[s*nq+n*MeIndx+nnIndx0[i+n0*k]];     // BJ
             }
+            // // BJ: check
+            // Rprintf("con.mean=%f\n", d);
 
 #ifdef _OPENMP
 #pragma omp atomic
@@ -215,8 +221,10 @@ extern "C" {
 
             zIndx++;
 
-            w0[s*n0q+n0*MeIndx+i] = sqrt(sigmaSq - F77_NAME(ddot)(&m, &tmp_B[threadID*twom], &inc, &c[threadID*twom], &inc))*wZ[zIndx] + d; // BJ
-
+            w0[s*n0q+n0*MeIndx+i] = sqrt(sigmaSq - F77_NAME(ddot)(&m, &tmp_B[threadID*twom], &inc, &c[threadID*twom], &inc) + eps)*wZ[zIndx] + d; // BJ
+            // // BJ: check
+            // Rprintf("cod.var=%f\n", sigmaSq - F77_NAME(ddot)(&m, &tmp_B[threadID*twom], &inc, &c[threadID*twom], &inc));
+            
             if(family == 1){
               y0[s*n0q+n0*MeIndx+i] = sqrt(tauSqj)*yZ[zIndx] + F77_NAME(ddot)(&p, &X0[i], &n0, &beta[s*pq+p*MeIndx], &inc) + w0[s*n0q+n0*MeIndx+i]; // BJ
             }else{//binomial
@@ -257,7 +265,9 @@ extern "C" {
             sigmaSq = theta[s*nTheta+sigmaSqIndx];
             tauSqj = tauSq[s*q+MeIndx];                                         // BJ
             rhoj = rho[s*(q-1)+(MeIndx-1)];                                     // BJ
-
+            // // BJ: check
+            // Rprintf("phi=%f, sigmaSq=%f, tauSq=%f, rho=%f\n", phi, sigmaSq, tauSqj, rhoj);
+            
             for(k = 0; k < twom; k++){
               if (k < m) {
                 d = dist2(coords[nnIndx0[i+n0*k]], coords[n+nnIndx0[i+n0*k]], coords0[i], coords0[n0+i]);
@@ -299,6 +309,8 @@ extern "C" {
                 d += tmp_B[threadID*twom+k]*w[s*nq+n*MeIndx+nnIndx0[i+n0*k2]];  // BJ
               }
             }
+            // // BJ: check
+            // Rprintf("con.mean=%f\n", d);
 
 #ifdef _OPENMP
 #pragma omp atomic
@@ -306,8 +318,10 @@ extern "C" {
 
             zIndx++;
 
-            w0[s*n0q+n0*MeIndx+i] = sqrt(sigmaSq - F77_NAME(ddot)(&twom, &tmp_B[threadID*twom], &inc, &c[threadID*twom], &inc))*wZ[zIndx] + d; // BJ
-
+            w0[s*n0q+n0*MeIndx+i] = sqrt(sigmaSq - F77_NAME(ddot)(&twom, &tmp_B[threadID*twom], &inc, &c[threadID*twom], &inc) + eps)*wZ[zIndx] + d; // BJ
+            // // BJ: check
+            // Rprintf("con.var=%f\n", sigmaSq - F77_NAME(ddot)(&twom, &tmp_B[threadID*twom], &inc, &c[threadID*twom], &inc));
+            
             if(family == 1){
               y0[s*n0q+n0*MeIndx+i] = sqrt(tauSqj)*yZ[zIndx] + F77_NAME(ddot)(&p, &X0[i], &n0, &beta[s*pq+p*MeIndx], &inc) + w0[s*n0q+n0*MeIndx+i]; // BJ
             }else{//binomial

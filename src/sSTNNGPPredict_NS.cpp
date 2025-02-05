@@ -25,7 +25,7 @@ extern "C" {
                          SEXP sigmaSqSamples_r, SEXP phiSamples_r, 
                          SEXP crossphiSamples_r, SEXP nuSamples_r, SEXP wSamples_r, 
                          SEXP nSamples_r, SEXP family_r, SEXP covModel_r, SEXP nThreads_r, 
-                         SEXP verbose_r, SEXP nReport_r){
+                         SEXP verbose_r, SEXP nReport_r, SEXP eps_r){
     
     int h, i, j, k, k2, l, l2, s, info, nProtect=0, MeIndx, ParentIndx;
     const int inc = 1;
@@ -71,6 +71,7 @@ extern "C" {
     int nThreads = INTEGER(nThreads_r)[0];
     int verbose = INTEGER(verbose_r)[0];
     int nReport = INTEGER(nReport_r)[0];
+    double eps = REAL(eps_r)[0];                                                // BJ 
     
 #ifdef _OPENMP
     omp_set_num_threads(nThreads);
@@ -206,7 +207,7 @@ extern "C" {
             
             zIndx++;
             
-            w0[s*n0q+n0*MeIndx+i] = sqrt(sigmaSqj - F77_NAME(ddot)(&m, &tmp_B[threadID*twom], &inc, &c[threadID*twom], &inc))*wZ[zIndx] + d; // BJ
+            w0[s*n0q+n0*MeIndx+i] = sqrt(sigmaSqj - F77_NAME(ddot)(&m, &tmp_B[threadID*twom], &inc, &c[threadID*twom], &inc) + eps)*wZ[zIndx] + d; // BJ
             
             if(family == 1){
               y0[s*n0q+n0*MeIndx+i] = sqrt(tauSqj)*yZ[zIndx] + F77_NAME(ddot)(&p, &X0[i], &n0, &beta[s*pq+p*MeIndx], &inc) + w0[s*n0q+n0*MeIndx+i]; // BJ
@@ -304,7 +305,7 @@ extern "C" {
             
             zIndx++;
             
-            w0[s*n0q+n0*MeIndx+i] = sqrt(sigmaSqj - F77_NAME(ddot)(&twom, &tmp_B[threadID*twom], &inc, &c[threadID*twom], &inc))*wZ[zIndx] + d; // BJ
+            w0[s*n0q+n0*MeIndx+i] = sqrt(sigmaSqj - F77_NAME(ddot)(&twom, &tmp_B[threadID*twom], &inc, &c[threadID*twom], &inc) + eps)*wZ[zIndx] + d; // BJ
             
             if(family == 1){
               y0[s*n0q+n0*MeIndx+i] = sqrt(tauSqj)*yZ[zIndx] + F77_NAME(ddot)(&p, &X0[i], &n0, &beta[s*pq+p*MeIndx], &inc) + w0[s*n0q+n0*MeIndx+i]; // BJ

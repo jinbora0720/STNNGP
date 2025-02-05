@@ -68,10 +68,13 @@ extern "C" {
                SEXP rhoUnif_r,                                                  
                SEXP betaStarting_r, SEXP sigmaSqStarting_r, SEXP tauSqStarting_r, 
                SEXP phiStarting_r, SEXP nuStarting_r, 
-               SEXP rhoStarting_r, SEXP adjmatStarting_r,                       
+               SEXP rhoStarting_r, SEXP adjmatStarting_r,     
+               SEXP wStarting_r,     
                SEXP phiTuning_r, SEXP nuTuning_r, 
                SEXP rhoTuning_r,                                                
-               SEXP nSamples_r, SEXP nThreads_r, SEXP verbose_r, SEXP nReport_r);
+               SEXP nSamples_r, SEXP nThreads_r, SEXP verbose_r, SEXP nReport_r, 
+               SEXP updatew_r,
+               SEXP savew_r);
   
   SEXP sSTNNGP_NS(SEXP y_r, SEXP X_r, 
                   SEXP q_r,                                                     
@@ -89,7 +92,8 @@ extern "C" {
                   SEXP phiStarting_r, 
                   SEXP crossphiStarting_r,                                      
                   SEXP nuStarting_r, 
-                  SEXP rhoStarting_r, SEXP adjmatStarting_r,                    
+                  SEXP rhoStarting_r, SEXP adjmatStarting_r,     
+                  SEXP wStarting_r,     
                   SEXP sigmaSqTuning_r,                                         
                   SEXP phiTuning_r, 
                   SEXP crossphiTuning_r,                                        
@@ -117,7 +121,8 @@ extern "C" {
                         SEXP wStarting_r,
                         SEXP phiTuning_r, SEXP nuTuning_r, 
                         SEXP rhoTuning_r,                                       
-                        SEXP nSamples_r, SEXP nThreads_r, SEXP verbose_r, SEXP nReport_r);
+                        SEXP nSamples_r, SEXP nThreads_r, SEXP verbose_r, SEXP nReport_r, 
+                        SEXP savew_r);
   
   SEXP sSTNNGP_NS_misalign(SEXP y_r, SEXP X_r, 
                            SEXP XtX_r,                                          
@@ -137,13 +142,15 @@ extern "C" {
                            SEXP phiStarting_r, 
                            SEXP crossphiStarting_r,                                      
                            SEXP nuStarting_r, 
-                           SEXP rhoStarting_r, SEXP adjmatStarting_r,                    
+                           SEXP rhoStarting_r, SEXP adjmatStarting_r,     
+                           SEXP wStarting_r,     
                            SEXP sigmaSqTuning_r,                                         
                            SEXP phiTuning_r, 
                            SEXP crossphiTuning_r,                                        
                            SEXP nuTuning_r, 
                            SEXP rhoTuning_r,                                             
-                           SEXP nSamples_r, SEXP nThreads_r, SEXP verbose_r, SEXP nReport_r);
+                           SEXP nSamples_r, SEXP nThreads_r, SEXP verbose_r, SEXP nReport_r, 
+                           SEXP savew_r);
     
     SEXP sSTNNGPPredict(SEXP X_r, SEXP y_r, SEXP coords_r, SEXP adjvec_r, 
                         SEXP n_r, SEXP q_r, SEXP p_r, SEXP m_r, 
@@ -151,7 +158,7 @@ extern "C" {
                         SEXP betaSamples_r, SEXP tauSqSamples_r, SEXP rhoSamples_r, 
                         SEXP thetaSamples_r, SEXP wSamples_r, 
                         SEXP nSamples_r, SEXP family_r, SEXP covModel_r, SEXP nThreads_r, 
-                        SEXP verbose_r, SEXP nReport_r);
+                        SEXP verbose_r, SEXP nReport_r, SEXP eps_r);
     
     SEXP sSTNNGPPredict_NS(SEXP X_r, SEXP y_r, SEXP coords_r, SEXP adjvec_r, 
                            SEXP n_r, SEXP q_r, SEXP p_r, SEXP m_r, 
@@ -160,7 +167,7 @@ extern "C" {
                            SEXP sigmaSqSamples_r, SEXP phiSamples_r, 
                            SEXP crossphiSamples_r, SEXP nuSamples_r, SEXP wSamples_r, 
                            SEXP nSamples_r, SEXP family_r, SEXP covModel_r, SEXP nThreads_r, 
-                           SEXP verbose_r, SEXP nReport_r);
+                           SEXP verbose_r, SEXP nReport_r, SEXP eps_r);
     
     SEXP sSTNNGPLogit(SEXP y_r, SEXP X_r, 
                       SEXP q_r,                                                   
@@ -182,7 +189,8 @@ extern "C" {
                       SEXP phiTuning_r, SEXP nuTuning_r, 
                       SEXP rhoTuning_r,                                           
                       SEXP nSamples_r, SEXP nThreads_r, SEXP verbose_r, SEXP nReport_r, 
-                      SEXP updatesigmaSq_r, SEXP updatebeta_r, SEXP updatew_r);
+                      SEXP updatesigmaSq_r, SEXP updatebeta_r, SEXP updatew_r, 
+                      SEXP savew_r);
     
     SEXP sSTNNGPLogit_NS(SEXP y_r, SEXP X_r, 
                          SEXP q_r,                                                
@@ -208,5 +216,6 @@ extern "C" {
                          SEXP crossphiTuning_r,                                   
                          SEXP nuTuning_r, 
                          SEXP rhoTuning_r,                                        
-                         SEXP nSamples_r, SEXP nThreads_r, SEXP verbose_r, SEXP nReport_r);
+                         SEXP nSamples_r, SEXP nThreads_r, SEXP verbose_r, SEXP nReport_r, 
+                         SEXP savew_r);
 }

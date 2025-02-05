@@ -25,19 +25,28 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response",
   } else {
     update.sigma.sq <- debug$update.sigma.sq
   }
-  if (is.null(debug$update.w)) {
-    update.w <- TRUE
-  } else {
-    update.w <- debug$update.w
-  }
   if (is.null(debug$update.beta)) {
     update.beta <- TRUE
   } else {
     update.beta <- debug$update.beta
   }
+  if (is.null(debug$update.w)) {
+    update.w <- TRUE
+  } else {
+    update.w <- debug$update.w
+  }
+  if (is.null(debug$save.w)) {
+    save.w <- TRUE
+  } else {
+    save.w <- debug$save.w
+  }
+  if (!update.w) {
+    save.w <- FALSE
+  }
   storage.mode(update.sigma.sq) <- "integer"
-  storage.mode(update.w) <- "integer"
   storage.mode(update.beta) <- "integer"
+  storage.mode(update.w) <- "integer"
+  storage.mode(save.w) <- "integer"
   
   ####################################################
   ##Formula
@@ -153,9 +162,9 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response",
     
     warning("Using user defined neighbor.info. No checks are done on the supplied neighbor information.")
     
-    if(!all(c("n.neighbors","nn.indx","nn.indx.lu",
+    if(!all(c("n.neighbors", "nn.indx", "nn.indx.lu",
               "nn.dist", "nn.dist.parent",                                      # BJ
-              "nn.indx.parent", "nn.indx.lu.parent", "nn.indx.lu.all",          # BJ
+              "nn.indx.parent", "nn.indx.lu.parent",                            # BJ
               "ord") %in% names(neighbor.info))){stop("The supplied neighbor.info is malformed.")}
 
     nn.indx <- neighbor.info$nn.indx
@@ -164,16 +173,16 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response",
     nn.dist.parent <- neighbor.info$nn.dist.parent                              # BJ
     nn.indx.parent <- neighbor.info$nn.indx.parent                              # BJ
     nn.indx.lu.parent <- neighbor.info$nn.indx.lu.parent                        # BJ
-    nn.indx.lu.all <- neighbor.info$nn.indx.lu.all                              # BJ
+    nn.indx.lu.all <- nn.indx.lu + nn.indx.lu.parent                            # BJ
     ord <- neighbor.info$ord
     n.neighbors <- neighbor.info$n.neighbors
     nn.indx.run.time <- neighbor.info$nn.indx.run.time
+    nn.indx.parent.run.time <- neighbor.info$nn.indx.parent.run.time            # BJ
     neighbor.info.provided <- TRUE
     
     if(method == "latent"){
       
-      if(!all(c("u.indx", "u.indx.lu", "ui.indx") %in% names(neighbor.info))){
-        ##must be neighbor.info from a response or conjugate model
+      if(!all(c("u.indx", "u.indx.lu", "ui.indx") %in% names(neighbor.info))){##must be neighbor.info from a response model
         neighbor.info <- c(neighbor.info, mkUIndx(n, n.neighbors, nn.indx, nn.indx.lu, u.search.type))
         print("Computing additional index needed for method = 'latent' using user defined neighbor.info. This might take a while if n is large.")
       }
@@ -182,6 +191,16 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response",
       u.indx.lu <- neighbor.info$u.indx.lu
       ui.indx <- neighbor.info$ui.indx
       u.indx.run.time <- neighbor.info$u.indx.run.time
+      
+      if(!all(c("uu.indx", "uu.indx.lu", "uui.indx") %in% names(neighbor.info))){##must be neighbor.info from a response model
+        neighbor.info <- c(neighbor.info, mkuUIndx(n, n.neighbors, nn.indx.parent, nn.indx.lu.parent))
+        print("Computing additional index needed for method = 'latent' using user defined neighbor.info. This might take a while if n is large.")
+      }
+      
+      uu.indx <- neighbor.info$uu.indx
+      uu.indx.lu <- neighbor.info$uu.indx.lu
+      uui.indx <- neighbor.info$uui.indx
+      uu.indx.run.time <- neighbor.info$run.time
     }
     
   }else{
@@ -614,7 +633,7 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response",
       storage.mode(u.indx.lu) <- "integer"
       storage.mode(ui.indx) <- "integer"
       
-      uindx <- mkuUIndx(n, n.neighbors, nn.indx.parent, nn.indx.lu.parent) # BJ: test
+      uindx <- mkuUIndx(n, n.neighbors, nn.indx.parent, nn.indx.lu.parent) 
 
       uu.indx <- uindx$uu.indx
       uu.indx.lu <- uindx$uu.indx.lu
@@ -624,15 +643,15 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response",
       storage.mode(uu.indx) <- "integer"
       storage.mode(uu.indx.lu) <- "integer"
       storage.mode(uui.indx) <- "integer"
-      
-      c.indx <- unlist(apply(adjmat.starting, 1, function(x) which(x == 1)-1))  # BJ
-      c.indx.len <- unlist(apply(adjmat.starting, 1, function(x) sum(x == 1)))  # BJ
-      c.indx.lu <- c(cumsum(c(0,c.indx.len[-q])), c.indx.len)                   # BJ: 2q 
-      
-      storage.mode(c.indx) <- "integer"                                         # BJ
-      storage.mode(c.indx.lu) <- "integer"                                      # BJ
     }
-  }  
+  }
+  
+  c.indx <- unlist(apply(adjmat.starting, 1, function(x) which(x == 1)-1))      # BJ
+  c.indx.len <- unlist(apply(adjmat.starting, 1, function(x) sum(x == 1)))      # BJ
+  c.indx.lu <- c(cumsum(c(0,c.indx.len[-q])), c.indx.len)                       # BJ: 2q 
+  
+  storage.mode(c.indx) <- "integer"                                             # BJ
+  storage.mode(c.indx.lu) <- "integer"                                          # BJ
   
   ####################################################
   ##Other stuff
@@ -708,7 +727,8 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response",
                        w.starting,
                        phi.tuning, nu.tuning,
                        rho.tuning,
-                       n.samples, n.omp.threads, verbose, n.report)
+                       n.samples, n.omp.threads, verbose, n.report, 
+                       save.w)
         } else {
           out <- .Call("sSTNNGP", Y, X, q, p, n, n.neighbors, coords,
                        cov.model.indx, nn.indx, nn.indx.lu,
@@ -724,9 +744,11 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response",
                        phi.starting, nu.starting,
                        rho.starting,
                        adjmat.starting,
+                       w.starting,
                        phi.tuning, nu.tuning,
                        rho.tuning,
-                       n.samples, n.omp.threads, verbose, n.report)
+                       n.samples, n.omp.threads, verbose, n.report, 
+                       save.w)                                                  # BJ
         }
       } else {
         if (misalign) {
@@ -749,12 +771,14 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response",
                        nu.starting,
                        rho.starting,
                        adjmat.starting,
+                       w.starting,
                        sigma.sq.tuning,
                        phi.tuning,
                        cross.phi.tuning,                                        # BJ: added compared to sSTNNGP
                        nu.tuning,
                        rho.tuning,
-                       n.samples, n.omp.threads, verbose, n.report)
+                       n.samples, n.omp.threads, verbose, n.report, 
+                       save.w)
         } else {
           out <- .Call("sSTNNGP_NS", Y, X, q, p, n, n.neighbors, coords,
                        cov.model.indx, nn.indx, nn.indx.lu,
@@ -772,12 +796,14 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response",
                        nu.starting,
                        rho.starting,
                        adjmat.starting,
+                       w.starting,
                        sigma.sq.tuning,
                        phi.tuning,
                        cross.phi.tuning,                                        # BJ: added compared to sSTNNGP
                        nu.tuning,
                        rho.tuning,
-                       n.samples, n.omp.threads, verbose, n.report)
+                       n.samples, n.omp.threads, verbose, n.report, 
+                       save.w)
         }
       }
     }
@@ -802,7 +828,7 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response",
                    w.starting, 
                    phi.tuning, nu.tuning, rho.tuning,
                    n.samples, n.omp.threads, verbose, n.report, 
-                   update.sigma.sq, update.beta, update.w)
+                   update.sigma.sq, update.beta, update.w, save.w)
       
       col.names <- c("sigma.sq", "phi")
       
@@ -834,7 +860,7 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response",
                    cross.phi.tuning,                                            # BJ: added compared to sSTNNGP
                    nu.tuning,
                    rho.tuning,
-                   n.samples, n.omp.threads, verbose, n.report)
+                   n.samples, n.omp.threads, verbose, n.report, save.w)
     }
   }
 
@@ -904,7 +930,7 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response",
   out$X <- X[order(ord),,drop=FALSE]
   out$weights <- matrix(weights, nrow = n, ncol = q)[order(ord),,drop=FALSE]    # BJ
 
-  if(method == "latent"){
+  if(method == "latent" & save.w){
     out$p.w.samples <- out$p.w.samples[rep(0:(q-1)*n, each = n)+order(ord),,drop=FALSE] # BJ
     # if (misalign) {                                                             # BJ: posterior predictive sample
     #   if (family == "gaussian") {

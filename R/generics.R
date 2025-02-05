@@ -417,7 +417,9 @@
 # }
 
 predict.STNNGP <- function(object, X.0, coords.0, sub.sample, n.omp.threads = 1, 
-                           verbose=TRUE, n.report=100, ...){
+                           verbose=TRUE, n.report=100, eps=0, ...){             # BJ
+  
+  # eps: threashold to add when conditional variance becomes negative due to small sigma.sq
   
   ####################################################
   ##Check for unused args
@@ -558,6 +560,7 @@ predict.STNNGP <- function(object, X.0, coords.0, sub.sample, n.omp.threads = 1,
   storage.mode(verbose) <- "integer"
   storage.mode(n.report) <- "integer"
   storage.mode(family.indx) <- "integer"
+  storage.mode(eps) <- "double"
   
   ptm <- proc.time()
   
@@ -569,7 +572,7 @@ predict.STNNGP <- function(object, X.0, coords.0, sub.sample, n.omp.threads = 1,
                           p.beta.samples, p.tausq.samples, p.rho.samples, 
                           p.theta.samples, p.w.samples, 
                           n.samples, family.indx, cov.model.indx, n.omp.threads, 
-                          verbose, n.report))
+                          verbose, n.report, eps))
     } else {
       out <- c(out, .Call("sSTNNGPPredict_NS", X, Y, coords, adjvec, 
                           n, q, p, n.neighbors, 
