@@ -581,7 +581,7 @@ predict.STNNGP <- function(object, X.0, coords.0, sub.sample, n.omp.threads = 1,
                           p.sigmasq.samples, p.phi.samples, p.crossphi.samples, 
                           p.nu.samples, p.w.samples, 
                           n.samples, family.indx, cov.model.indx, n.omp.threads, 
-                          verbose, n.report))
+                          verbose, n.report, eps))
     }
   }else{
     if (out$mv.model == "separable") {
