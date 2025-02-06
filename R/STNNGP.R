@@ -748,6 +748,7 @@ STNNGP <- function(formula, data = parent.frame(), coords, method = "response",
                        phi.tuning, nu.tuning,
                        rho.tuning,
                        n.samples, n.omp.threads, verbose, n.report, 
+                       update.w,                                                # BJ
                        save.w)                                                  # BJ
         }
       } else {
